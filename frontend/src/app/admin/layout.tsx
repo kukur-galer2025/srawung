@@ -10,6 +10,7 @@ import {
   Bot,
   ClipboardCheck,
   ExternalLink,
+  FileText,
   Flag,
   GalleryHorizontal,
   Layers,
@@ -64,6 +65,7 @@ const NAV: { group: string | null; items: NavItem[] }[] = [
       { name: 'Blog', href: '/admin/blog', icon: Newspaper },
       { name: 'Banner', href: '/admin/banner', icon: GalleryHorizontal },
       { name: 'Newsletter', href: '/admin/newsletter', icon: Mails },
+      { name: 'Brosur PDF', href: '/admin/brosur', icon: FileText },
     ],
   },
   {

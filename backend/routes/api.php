@@ -190,6 +190,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::apiResource('/categories', AdminCategoryController::class);
     Route::apiResource('/coupons', AdminCouponController::class);
     Route::apiResource('/bundles', AdminBundleController::class)->except('show');
+    Route::post('/brochure', [\App\Http\Controllers\Api\Admin\BrochureController::class, 'generate'])->middleware('throttle:20,1');
 
     Route::prefix('/newsletter')->group(function () {
         Route::get('/overview', [AdminNewsletterController::class, 'overview']);
