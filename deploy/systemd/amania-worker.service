@@ -1,0 +1,28 @@
+# Alternatif Supervisor: queue worker sebagai layanan systemd.
+#
+#   sudo cp deploy/systemd/amania-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now amania-worker
+#   systemctl status amania-worker         # cek status
+#   journalctl -u amania-worker -f         # lihat log
+#
+# Gunakan SALAH SATU: Supervisor atau systemd, bukan keduanya.
+
+[Unit]
+Description=Amania queue worker (email, konversi PDF)
+After=network.target mysql.service
+StartLimitIntervalSec=0
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/amania/backend
+ExecStart=/usr/bin/php artisan queue:work database --sleep=3 --tries=3 --timeout=1800 --max-time=3600
+Restart=always
+RestartSec=5
+# Beri waktu konversi PDF besar selesai saat layanan dihentikan.
+TimeoutStopSec=1810
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

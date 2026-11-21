@@ -1,0 +1,25 @@
+# Frontend Next.js (hasil "npm run build") sebagai layanan systemd.
+#
+#   cd /var/www/amania/frontend && npm ci && npm run build
+#   sudo cp deploy/systemd/amania-frontend.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now amania-frontend
+#
+# Variabel NEXT_PUBLIC_* dibaca saat BUILD (dari frontend/.env.production),
+# jadi setiap mengubahnya jalankan ulang "npm run build" lalu restart layanan ini.
+
+[Unit]
+Description=Amania frontend (Next.js)
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/amania/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

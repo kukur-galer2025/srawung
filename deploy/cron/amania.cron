@@ -1,0 +1,11 @@
+# Scheduler Amania — SATU baris ini menjalankan semua tugas terjadwal:
+#   kedaluwarsa pesanan & pengingat bayar (5 menit), kabar promo wishlist (30 menit),
+#   dan cek kesehatan + email peringatan (5 menit).
+#
+# Pasang (sebagai user web server):
+#   sudo crontab -u www-data deploy/cron/amania.cron
+#   sudo crontab -u www-data -l        # pastikan terpasang
+#
+# Sesuaikan /var/www/amania bila folder Anda berbeda.
+
+* * * * * cd /var/www/amania/backend && php artisan schedule:run >> /dev/null 2>&1

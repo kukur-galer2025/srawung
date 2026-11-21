@@ -1,0 +1,13 @@
+{
+  "name": "amania-buku",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Amania.com - Toko Buku Digital (Laravel 13 + Next.js 16)",
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "cd backend && php artisan serve",
+    "dev:queue": "cd backend && php artisan queue:work --tries=3 --timeout=120",
+    "dev:scheduler": "cd backend && php artisan schedule:work",
+    "build:frontend": "npm run build --prefix frontend"
+  }
+}

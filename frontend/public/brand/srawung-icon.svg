@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Srawung">
+  <!-- Ikon datar SRAWUNG: huruf S bersudut potong dari dua "lipatan halaman" (atas putih, bawah jade) di kotak Hijau Tua. -->
+  <rect width="64" height="64" rx="15" fill="#0F4C3F"/>
+  <path d="M45 18.5H24.5L19.5 23.5V27.5L24.5 32.5H34" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="miter"/>
+  <path d="M30 32.5H39.5L44.5 37.5V41.5L39.5 46.5H19" fill="none" stroke="#2FAE7B" stroke-width="7" stroke-linejoin="miter"/>
+</svg>
