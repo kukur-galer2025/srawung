@@ -165,10 +165,10 @@ Route::middleware(['auth:sanctum', 'creator'])->prefix('creator')->group(functio
     Route::get('/payouts', [\App\Http\Controllers\Api\Creator\DashboardController::class, 'payouts']);
     Route::post('/payouts', [\App\Http\Controllers\Api\Creator\DashboardController::class, 'requestPayout'])->middleware('throttle:10,1');
 
-    Route::apiResource('/books', \App\Http\Controllers\Api\Creator\BookController::class);
+    Route::apiResource('/books', \App\Http\Controllers\Api\Creator\BookController::class)->names('creator.books');
     Route::post('/books/{id}/upload', [\App\Http\Controllers\Api\Creator\BookController::class, 'uploadFile']);
     Route::post('/books/{id}/reprocess', [\App\Http\Controllers\Api\Creator\BookController::class, 'reprocess']);
-    Route::apiResource('/coupons', \App\Http\Controllers\Api\Creator\CouponController::class)->except('show');
+    Route::apiResource('/coupons', \App\Http\Controllers\Api\Creator\CouponController::class)->except('show')->names('creator.coupons');
 });
 
 // Admin
