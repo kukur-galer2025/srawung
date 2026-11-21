@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /** srawung:create-admin — admin produksi tanpa data demo. */
@@ -15,6 +16,9 @@ class CreateAdminCommandTest extends TestCase
 
     public function test_creates_admin_with_strong_password_and_base_categories(): void
     {
+        // Kondisi server baru: tabel kategori kosong.
+        Schema::withoutForeignKeyConstraints(fn () => Category::query()->delete());
+
         $this->artisan('srawung:create-admin', ['--name' => 'Pemilik', '--email' => 'Pemilik@Srawung.NET'])
             ->expectsQuestion('Kata sandi (min. 12 karakter)', 'sandi-yang-kuat-123')
             ->expectsQuestion('Ulangi kata sandi', 'sandi-yang-kuat-123')
@@ -24,7 +28,9 @@ class CreateAdminCommandTest extends TestCase
         $this->assertSame('admin', $admin->role);
         $this->assertNotNull($admin->email_verified_at);
         $this->assertTrue(Hash::check('sandi-yang-kuat-123', $admin->password));
-        $this->assertSame(4, Category::count());
+        foreach (['pemrograman', 'teknologi-ai', 'desain', 'persiapan-ujian'] as $slug) {
+            $this->assertTrue(Category::where('slug', $slug)->exists(), "kategori dasar {$slug} dibuat");
+        }
     }
 
     public function test_rejects_short_or_mismatched_password(): void
