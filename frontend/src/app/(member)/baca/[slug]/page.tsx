@@ -18,6 +18,7 @@ import {
   Minimize2,
   Moon,
   MonitorSmartphone,
+  MoveHorizontal,
   Pencil,
   Search,
   ShieldAlert,
@@ -204,6 +205,13 @@ export default function ReaderPage() {
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [dragging, setDragging] = useState(false);
 
+  // Nilai terbaru untuk listener sentuh yang dipasang sekali (callback ref).
+  const zoomNow = useRef(zoom);
+  const flipPage = useRef<(dir: 1 | -1) => void>(() => {});
+  useEffect(() => {
+    zoomNow.current = zoom;
+  }, [zoom]);
+
   const zoomIn = useCallback(() => setZoom((z) => ZOOM_STEPS.find((s) => s > z + 0.01) ?? ZOOM_MAX), []);
   const zoomOut = useCallback(() => setZoom((z) => [...ZOOM_STEPS].reverse().find((s) => s < z - 0.01) ?? 1), []);
   const zoomReset = useCallback(() => setZoom(1), []);
@@ -224,9 +232,50 @@ export default function ReaderPage() {
       setZoom((z) => clampZoom(z * Math.exp(-e.deltaY * 0.0025)));
     };
     node.addEventListener('wheel', onWheel, { passive: false });
+
+    // Layar sentuh: cubit dua jari = zoom halaman (bukan seluruh situs);
+    // geser kiri/kanan saat 100% = ganti halaman. Saat diperbesar, geser = menggeser halaman.
+    let pinch: { d: number; z: number } | null = null;
+    let swipe: { x: number; y: number; t: number } | null = null;
+    const spread = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        pinch = { d: spread(e.touches) || 1, z: zoomNow.current };
+        swipe = null;
+      } else if (e.touches.length === 1) {
+        swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (pinch && e.touches.length === 2) {
+        e.preventDefault();
+        setZoom(clampZoom((pinch.z * spread(e.touches)) / pinch.d));
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinch = null;
+      if (swipe && e.touches.length === 0 && zoomNow.current <= 1.01) {
+        const end = e.changedTouches[0];
+        const dx = end.clientX - swipe.x;
+        const dy = end.clientY - swipe.y;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - swipe.t < 700) {
+          flipPage.current(dx < 0 ? 1 : -1);
+        }
+      }
+      if (e.touches.length === 0) swipe = null;
+    };
+    node.addEventListener('touchstart', onTouchStart, { passive: true });
+    node.addEventListener('touchmove', onTouchMove, { passive: false });
+    node.addEventListener('touchend', onTouchEnd);
+    node.addEventListener('touchcancel', onTouchEnd);
+
     return () => {
       ro.disconnect();
       node.removeEventListener('wheel', onWheel);
+      node.removeEventListener('touchstart', onTouchStart);
+      node.removeEventListener('touchmove', onTouchMove);
+      node.removeEventListener('touchend', onTouchEnd);
+      node.removeEventListener('touchcancel', onTouchEnd);
       viewEl.current = null;
     };
   }, []);
@@ -276,6 +325,8 @@ export default function ReaderPage() {
 
   // Lebar halaman "pas layar", lalu dikali zoom.
   const fitWidth = box.w > 0 && box.h > 0 ? Math.min(box.w - 2, (box.h - 2) * aspect) : 0;
+  // "Pas lebar": zoom yang membuat halaman selebar ruang baca (berguna di layar laptop yang lebar).
+  const widthZoom = fitWidth ? clampZoom(Math.floor(((box.w - 4) / fitWidth) * 100) / 100) : 1;
 
   /* ---------------- Sesi baca ---------------- */
   useEffect(() => {
@@ -526,10 +577,22 @@ export default function ReaderPage() {
     [totalPages]
   );
 
+  useEffect(() => {
+    flipPage.current = (dir) => goToPage(currentPage + dir);
+  }, [currentPage, goToPage]);
+
   // Navigasi keyboard.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Ctrl/⌘ + = − 0 mengatur zoom buku, bukan zoom seluruh browser (seperti PDF.js).
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && ['+', '=', '-', '_', '0'].includes(e.key)) {
+        e.preventDefault();
+        if (e.key === '0') zoomReset();
+        else if (e.key === '-' || e.key === '_') zoomOut();
+        else zoomIn();
+        return;
+      }
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault();
         goToPage(currentPage + 1);
@@ -715,6 +778,20 @@ export default function ReaderPage() {
           <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} title="Perbesar (+)" aria-label="Perbesar" className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-current/10 disabled:opacity-30">
             <ZoomIn className="h-4 w-4" />
           </button>
+          {widthZoom > 1.05 && (
+            <>
+              <span className="mx-0.5 h-5 w-px bg-current opacity-15" />
+              <button
+                onClick={() => setZoom((z) => (Math.abs(z - widthZoom) < 0.02 ? 1 : widthZoom))}
+                aria-pressed={Math.abs(zoom - widthZoom) < 0.02}
+                title={Math.abs(zoom - widthZoom) < 0.02 ? 'Kembali pas halaman' : 'Pas lebar'}
+                aria-label="Pas lebar"
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${Math.abs(zoom - widthZoom) < 0.02 ? 'bg-amber-400 text-slate-900' : 'hover:bg-current/10'}`}
+              >
+                <MoveHorizontal className="h-4 w-4" />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Area halaman */}
@@ -725,6 +802,7 @@ export default function ReaderPage() {
           onPointerUp={onPanEnd}
           onPointerCancel={onPanEnd}
           onDoubleClick={() => (zoom > 1 ? zoomReset() : setZoom(2))}
+          style={{ touchAction: 'pan-x pan-y' }}
           className={`reader-canvas-container relative flex flex-1 overflow-auto p-3 sm:p-6 ${zoom > 1 ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
         >
           <div className="reader-page relative m-auto shrink-0 overflow-hidden rounded-lg border border-black/15 bg-white shadow-2xl">
