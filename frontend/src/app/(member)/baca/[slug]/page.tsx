@@ -214,7 +214,8 @@ export default function ReaderPage() {
     if (!node) return;
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      setBox({ w: Math.floor(width), h: Math.floor(height) });
+      // Pengaman: tinggi "pas layar" tidak pernah melebihi layar, walau area ikut memanjang.
+      setBox({ w: Math.floor(width), h: Math.floor(Math.min(height, window.innerHeight - 140)) });
     });
     ro.observe(node);
     const onWheel = (e: WheelEvent) => {
@@ -627,7 +628,7 @@ export default function ReaderPage() {
   );
 
   return (
-    <div ref={containerRef} className={`relative flex min-h-screen select-none flex-col overflow-hidden font-sans transition-colors duration-300 ${t.page}`}>
+    <div ref={containerRef} className={`relative flex h-dvh select-none flex-col overflow-hidden font-sans transition-colors duration-300 ${t.page}`}>
       {/* Bilah atas */}
       <header className={`sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-3 py-2.5 backdrop-blur-md transition-colors sm:px-4 ${t.bar}`}>
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -687,7 +688,7 @@ export default function ReaderPage() {
         <div className="h-full bg-amber-400 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
       </div>
 
-      <div className="relative flex flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {pageLoading && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-2 bg-black/30 backdrop-blur-[2px]">
             <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
