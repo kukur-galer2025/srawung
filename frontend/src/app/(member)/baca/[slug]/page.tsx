@@ -25,6 +25,8 @@ import {
   Sun,
   Trash2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,6 +38,12 @@ import { NextReadCard } from '@/components/store/NextReads';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 type Panel = 'toc' | 'search' | 'bookmarks' | 'notes';
+
+/** Tingkat zoom: 1 = pas layar. Tombol +/− melompat antar-tingkat; Ctrl+scroll/cubit touchpad halus. */
+const ZOOM_STEPS = [1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+const ZOOM_MAX = ZOOM_STEPS[ZOOM_STEPS.length - 1];
+const ZOOM_KEY = 'srawung:reader-zoom';
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(1, Math.round(z * 100) / 100));
 type Theme = 'dark' | 'sepia' | 'light';
 
 interface BookmarkItem {
@@ -180,6 +188,94 @@ export default function ReaderPage() {
   const [panel, setPanel] = useState<Panel | null>(null);
   const t = THEMES[theme];
 
+  /* ---------------- Zoom ---------------- */
+  const [zoom, setZoom] = useState(() => {
+    try {
+      const saved = Number(window.localStorage.getItem(ZOOM_KEY));
+      return saved ? clampZoom(saved) : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const [aspect, setAspect] = useState(0.707); // lebar ÷ tinggi halaman (A4 sampai gambar dimuat)
+  const [box, setBox] = useState({ w: 0, h: 0 }); // ruang baca tanpa padding
+  const viewEl = useRef<HTMLDivElement | null>(null);
+  const prevZoom = useRef(zoom);
+  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const zoomIn = useCallback(() => setZoom((z) => ZOOM_STEPS.find((s) => s > z + 0.01) ?? ZOOM_MAX), []);
+  const zoomOut = useCallback(() => setZoom((z) => [...ZOOM_STEPS].reverse().find((s) => s < z - 0.01) ?? 1), []);
+  const zoomReset = useCallback(() => setZoom(1), []);
+
+  // Ukur ruang baca (berubah saat jendela diubah / panel dibuka) + Ctrl+scroll untuk zoom.
+  const viewRef = useCallback((node: HTMLDivElement | null) => {
+    viewEl.current = node;
+    if (!node) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setBox({ w: Math.floor(width), h: Math.floor(height) });
+    });
+    ro.observe(node);
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return; // scroll biasa = geser halaman
+      e.preventDefault(); // cegah zoom seluruh browser
+      setZoom((z) => clampZoom(z * Math.exp(-e.deltaY * 0.0025)));
+    };
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      ro.disconnect();
+      node.removeEventListener('wheel', onWheel);
+      viewEl.current = null;
+    };
+  }, []);
+
+  // Pertahankan titik tengah tampilan saat zoom berubah, lalu ingat pilihan pembaca.
+  useEffect(() => {
+    const el = viewEl.current;
+    const ratio = zoom / prevZoom.current;
+    prevZoom.current = zoom;
+    try {
+      window.localStorage.setItem(ZOOM_KEY, String(zoom));
+    } catch {
+      /* penyimpanan diblokir — abaikan */
+    }
+    if (!el || ratio === 1) return;
+    const cx = el.scrollLeft + el.clientWidth / 2;
+    const cy = el.scrollTop + el.clientHeight / 2;
+    requestAnimationFrame(() => {
+      el.scrollLeft = cx * ratio - el.clientWidth / 2;
+      el.scrollTop = cy * ratio - el.clientHeight / 2;
+    });
+  }, [zoom]);
+
+  // Halaman baru dibuka dari atas.
+  useEffect(() => {
+    viewEl.current?.scrollTo({ top: 0, left: 0 });
+  }, [currentPage]);
+
+  // Geser halaman dengan mouse saat diperbesar (di layar sentuh cukup geser jari).
+  const onPanStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = viewEl.current;
+    if (!el || zoom <= 1 || e.pointerType !== 'mouse' || e.button !== 0) return;
+    drag.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+    el.setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+  const onPanMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = viewEl.current;
+    if (!el || !drag.current) return;
+    el.scrollLeft = drag.current.left - (e.clientX - drag.current.x);
+    el.scrollTop = drag.current.top - (e.clientY - drag.current.y);
+  };
+  const onPanEnd = () => {
+    drag.current = null;
+    setDragging(false);
+  };
+
+  // Lebar halaman "pas layar", lalu dikali zoom.
+  const fitWidth = box.w > 0 && box.h > 0 ? Math.min(box.w - 2, (box.h - 2) * aspect) : 0;
+
   /* ---------------- Sesi baca ---------------- */
   useEffect(() => {
     if (!slug) return;
@@ -270,6 +366,7 @@ export default function ReaderPage() {
             canvas.width = img.width;
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
+            if (img.height) setAspect(img.width / img.height);
           }
           URL.revokeObjectURL(url);
           setLoadedPage(page);
@@ -440,11 +537,15 @@ export default function ReaderPage() {
         goToPage(currentPage - 1);
       } else if (e.key === 'Escape') {
         setPanel(null);
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (e.key === '+' || e.key === '=') zoomIn();
+        else if (e.key === '-' || e.key === '_') zoomOut();
+        else if (e.key === '0') zoomReset();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [currentPage, goToPage]);
+  }, [currentPage, goToPage, zoomIn, zoomOut, zoomReset]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -587,27 +688,53 @@ export default function ReaderPage() {
       </div>
 
       <div className="relative flex flex-1 overflow-hidden">
+        {pageLoading && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-2 bg-black/30 backdrop-blur-[2px]">
+            <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+            <p className="text-xs font-semibold text-white drop-shadow">Memuat halaman {currentPage}…</p>
+          </div>
+        )}
+        {pageNotice && !pageLoading && (
+          <div className="absolute left-1/2 top-4 z-20 w-[min(92%,28rem)] -translate-x-1/2 rounded-xl bg-slate-900/95 px-4 py-3 text-center text-sm text-white shadow-xl">
+            {pageNotice}
+            <button onClick={() => loadPage(currentPage)} className="ml-2 font-semibold text-amber-300 underline-offset-2 hover:underline">
+              Coba lagi
+            </button>
+          </div>
+        )}
+
+        {/* Kontrol zoom */}
+        <div className={`absolute bottom-3 right-3 z-20 flex items-center gap-0.5 rounded-xl border p-1 shadow-lg backdrop-blur-md ${t.bar}`}>
+          <button onClick={zoomOut} disabled={zoom <= 1} title="Perkecil (−)" aria-label="Perkecil" className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-current/10 disabled:opacity-30">
+            <ZoomOut className="h-4 w-4" />
+          </button>
+          <button onClick={zoomReset} title="Kembali pas layar (0)" className="min-w-12 rounded-lg px-1.5 py-1 text-xs font-semibold tabular-nums transition hover:bg-current/10">
+            {Math.round(zoom * 100)}%
+          </button>
+          <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} title="Perbesar (+)" aria-label="Perbesar" className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-current/10 disabled:opacity-30">
+            <ZoomIn className="h-4 w-4" />
+          </button>
+        </div>
+
         {/* Area halaman */}
-        <div className="reader-canvas-container relative flex flex-1 items-center justify-center overflow-auto p-3 sm:p-6">
-          {pageLoading && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-2 bg-black/30 backdrop-blur-[2px]">
-              <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
-              <p className="text-xs font-semibold text-white drop-shadow">Memuat halaman {currentPage}…</p>
-            </div>
-          )}
-          {pageNotice && !pageLoading && (
-            <div className="absolute left-1/2 top-4 z-20 w-[min(92%,28rem)] -translate-x-1/2 rounded-xl bg-slate-900/95 px-4 py-3 text-center text-sm text-white shadow-xl">
-              {pageNotice}
-              <button onClick={() => loadPage(currentPage)} className="ml-2 font-semibold text-amber-300 underline-offset-2 hover:underline">
-                Coba lagi
-              </button>
-            </div>
-          )}
-          <div className="reader-page relative overflow-hidden rounded-lg border border-black/15 bg-white shadow-2xl">
+        <div
+          ref={viewRef}
+          onPointerDown={onPanStart}
+          onPointerMove={onPanMove}
+          onPointerUp={onPanEnd}
+          onPointerCancel={onPanEnd}
+          onDoubleClick={() => (zoom > 1 ? zoomReset() : setZoom(2))}
+          className={`reader-canvas-container relative flex flex-1 overflow-auto p-3 sm:p-6 ${zoom > 1 ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+        >
+          <div className="reader-page relative m-auto shrink-0 overflow-hidden rounded-lg border border-black/15 bg-white shadow-2xl">
             <canvas
               ref={canvasRef}
-              className={`block max-w-full ${shield ? 'invisible' : ''}`}
-              style={{ maxHeight: 'calc(100vh - 140px)', width: 'auto', height: 'auto' }}
+              className={`block ${fitWidth ? 'max-w-none' : 'max-w-full'} ${shield ? 'invisible' : ''}`}
+              style={
+                fitWidth
+                  ? { width: Math.round(fitWidth * zoom), height: 'auto' }
+                  : { maxHeight: 'calc(100vh - 140px)', width: 'auto', height: 'auto' }
+              }
             />
             {user && <MovingWatermark name={user.name} email={user.email} />}
             {shield && (
