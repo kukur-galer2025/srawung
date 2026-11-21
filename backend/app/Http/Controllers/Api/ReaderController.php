@@ -139,17 +139,12 @@ class ReaderController extends Controller
         $image = $this->loadPageImage($book, (int) $pageNumber);
 
         // Tambahkan Watermark menggunakan GD
-        $width = imagesx($image);
         $height = imagesy($image);
 
-        // Warna watermark abu-abu transparan/kontras rendah
-        $watermarkColor = imagecolorallocatealpha($image, 180, 180, 180, 60);
-        $watermarkText = "{$user->name} | {$user->email} | Srawung";
-
-        // Gambar watermark miring/diagonal atau di beberapa titik
-        imagestring($image, 5, 40, $height - 50, $watermarkText, $watermarkColor);
-        imagestring($image, 5, 40, 30, "Akses Resmi: {$user->email}", $watermarkColor);
-        imagestring($image, 5, max(40, (int)($width / 4)), (int)($height / 2), "Dilisensikan kepada: {$user->name}", $watermarkColor);
+        // Satu baris identitas tipis di margin bawah (tidak mengganggu teks buku).
+        // Penanda utama tetap watermark bergerak di layar + kode forensik di bawah.
+        $watermarkColor = imagecolorallocatealpha($image, 150, 150, 150, 80);
+        imagestring($image, 3, 40, $height - 28, "Dilisensikan kepada {$user->name} | {$user->email} | Srawung", $watermarkColor);
 
         // Watermark forensik nyaris tak terlihat (kode akun) — tetap ada walau watermark di atas dipotong.
         ForensicMark::apply($image, $user);

@@ -76,8 +76,10 @@ class ForensicMark
 
         $pw = imagesx($page);
         $ph = imagesy($page);
-        $stepX = $w + (int) round($w * 0.6);
-        $stepY = $h * 4;
+        // Jarak renggang: cukup beberapa kode per halaman (potongan layar tetap memuat ≥1),
+        // tanpa membuat halaman terlihat "berpola".
+        $stepX = $w * 3;
+        $stepY = $h * 8;
 
         for ($row = 0, $y = (int) ($h * 0.8); $y < $ph; $row++, $y += $stepY) {
             $offset = $row % 2 ? (int) ($stepX / 2) : 0;

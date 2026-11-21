@@ -127,29 +127,24 @@ function MovingWatermark({ name, email }: { name: string; email: string }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const clock = setInterval(() => setNow(new Date()), 1000);
-    const move = setInterval(() => setTick((t) => t + 1), 7000);
+    const move = setInterval(() => setTick((t) => t + 1), 12000);
     return () => {
       clearInterval(clock);
       clearInterval(move);
     };
   }, []);
   const time = now.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const label = `${name} · ${email} · ${time}`;
+  const spot = SPOTS[tick % SPOTS.length];
 
+  // Satu label saja, tipis, berpindah pelan — cukup untuk menandai tangkapan layar tanpa mengganggu bacaan.
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-10 select-none overflow-hidden">
-      {[0, 1, 2].map((i) => {
-        const spot = SPOTS[(tick + i * 2) % SPOTS.length];
-        return (
-          <span
-            key={i}
-            className="absolute -rotate-[18deg] whitespace-nowrap text-[11px] font-semibold tracking-wide text-slate-900/[0.13] transition-all duration-[1600ms] ease-in-out sm:text-[13px]"
-            style={{ top: spot.top, left: spot.left }}
-          >
-            {label}
-          </span>
-        );
-      })}
+      <span
+        className="absolute rotate-[-18deg] whitespace-nowrap text-[11px] font-semibold tracking-wide text-slate-900/8 transition-all duration-2000 ease-in-out sm:text-[12px]"
+        style={{ top: spot.top, left: spot.left }}
+      >
+        {`${name} · ${email} · ${time}`}
+      </span>
     </div>
   );
 }
@@ -324,10 +319,37 @@ export default function ReaderPage() {
 
   // Sembunyikan halaman saat jendela kehilangan fokus (mis. Snipping Tool / aplikasi
   // perekam dibuka), dan saat tombol tangkap layar / cetak / simpan ditekan.
+  //
+  // Penggelapan dibuat INSTAN: kelas `reader-shield` dipasang langsung di <body> di dalam
+  // event handler (tanpa menunggu render React), sehingga halaman sudah hitam pada frame
+  // berikutnya. Tombol Win/⌘ dan Alt ikut memicunya karena hampir semua pintasan tangkap
+  // layar diawali tombol itu (Win+Shift+S, Win+PrtSc, Alt+PrtSc, ⌘+Shift+3/4/5) dan
+  // browser menerima tombol pengubahnya sebelum sistem operasi mengambil gambar.
   useEffect(() => {
-    const onBlur = () => setShield((s) => s ?? 'focus');
-    const onFocus = () => setShield((s) => (s === 'focus' ? null : s));
+    const body = document.body;
+    let releaseTimer: ReturnType<typeof setTimeout> | null = null;
+    const darken = () => {
+      body.classList.add('reader-shield');
+      if (releaseTimer) clearTimeout(releaseTimer);
+    };
+    const lighten = (delay: number) => {
+      if (releaseTimer) clearTimeout(releaseTimer);
+      releaseTimer = setTimeout(() => {
+        if (document.hasFocus()) body.classList.remove('reader-shield');
+      }, delay);
+    };
+
+    const onBlur = () => {
+      darken();
+      setShield((s) => s ?? 'focus');
+    };
+    const onFocus = () => {
+      lighten(250);
+      setShield((s) => (s === 'focus' ? null : s));
+    };
     const flashCapture = () => {
+      darken();
+      lighten(2500);
       setShield('capture');
       if (shieldTimer.current) clearTimeout(shieldTimer.current);
       shieldTimer.current = setTimeout(() => setShield(null), 2500);
@@ -340,6 +362,7 @@ export default function ReaderPage() {
       });
     };
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Meta' || e.key === 'OS' || e.key === 'Alt' || e.key === 'PrintScreen') darken();
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
       const blocked =
@@ -353,7 +376,10 @@ export default function ReaderPage() {
       }
     };
     // PrintScreen di Windows sering hanya memicu keyup.
-    const onKeyUp = (e: KeyboardEvent) => e.key === 'PrintScreen' && flashCapture();
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'PrintScreen') flashCapture();
+      else if (e.key === 'Meta' || e.key === 'OS' || e.key === 'Alt') lighten(900);
+    };
     const onBeforePrint = () => flashCapture();
 
     window.addEventListener('blur', onBlur);
@@ -368,7 +394,8 @@ export default function ReaderPage() {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
       window.removeEventListener('beforeprint', onBeforePrint);
-      document.body.classList.remove('reader-active');
+      document.body.classList.remove('reader-active', 'reader-shield');
+      if (releaseTimer) clearTimeout(releaseTimer);
       if (shieldTimer.current) clearTimeout(shieldTimer.current);
     };
   }, []);
@@ -576,10 +603,10 @@ export default function ReaderPage() {
               </button>
             </div>
           )}
-          <div className="relative overflow-hidden rounded-lg border border-black/15 bg-white shadow-2xl">
+          <div className="reader-page relative overflow-hidden rounded-lg border border-black/15 bg-white shadow-2xl">
             <canvas
               ref={canvasRef}
-              className={`block max-w-full transition-[filter] duration-150 ${shield ? 'blur-2xl' : ''}`}
+              className={`block max-w-full ${shield ? 'invisible' : ''}`}
               style={{ maxHeight: 'calc(100vh - 140px)', width: 'auto', height: 'auto' }}
             />
             {user && <MovingWatermark name={user.name} email={user.email} />}

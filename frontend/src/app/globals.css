@@ -438,6 +438,10 @@ body.swal2-toast-shown .swal2-container:has(> .swal2-toast) {
   color: #0f172a;
 }
 
+/* Perisai instan: dipasang langsung dari event keyboard/blur, tanpa transisi. */
+body.reader-shield .reader-page { background: #000 !important; }
+body.reader-shield .reader-page canvas { visibility: hidden !important; }
+
 /* Halaman baca tidak bisa dicetak / disimpan sebagai PDF lewat dialog cetak. */
 @media print {
   body.reader-active > * { display: none !important; }
