@@ -44,6 +44,12 @@ class DiscoveryController extends Controller
     public function searchInside(Request $request, BookSearch $search)
     {
         $data = $request->validate(['q' => 'required|string|min:2|max:200'], ['q.min' => 'Ketik minimal 2 huruf.']);
+        // Batas harian: cuplikan isi buku cukup untuk mencari, tidak cukup untuk menyalin buku sepotong-sepotong.
+        $who = $request->user('sanctum')?->id ?? $request->ip();
+        if (!\App\Support\SsrClient::is($request->ip())
+            && !\Illuminate\Support\Facades\RateLimiter::attempt("search-inside-day:{$who}", 200, fn () => true, 86400)) {
+            return response()->json(['message' => 'Batas pencarian isi buku hari ini sudah tercapai. Silakan lanjut besok.'], 429);
+        }
         $started = microtime(true);
         $result = $search->search($data['q'], 12);
 

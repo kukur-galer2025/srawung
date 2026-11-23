@@ -54,6 +54,13 @@ class Preflight extends Command
         $demo = User::where('email', 'like', '%@amania.com')->whereNull('anonymized_at')->count();
         $this->check('Akun demo @amania.com', $demo === 0, $demo ? "{$demo} akun" : 'tidak ada', 'Domain amania.com bukan milik Anda: email ke akun ini tidak akan sampai. Ganti emailnya atau hapus akunnya.', warnOnly: true);
 
+        $no2fa = User::where('role', 'admin')->where('is_blocked', false)->whereNull('two_factor_confirmed_at')->count();
+        $this->check('2FA semua admin aktif', $no2fa === 0, $no2fa === 0 ? 'aktif' : "{$no2fa} admin belum", 'Masuk sebagai admin → Keamanan akun → aktifkan verifikasi dua langkah.', warnOnly: true);
+        $lastIps = \App\Models\AccessLog::latest('id')->limit(50)->pluck('ip_address')->unique();
+        $masked = $lastIps->count() > 0 && $lastIps->every(fn ($ip) => in_array($ip, ['127.0.0.1', '::1'], true));
+        $this->check('IP asli pengunjung terbaca', !$masked, $masked ? 'semua 127.0.0.1' : 'ya', 'Set TRUSTED_PROXIES=127.0.0.1 lalu php artisan optimize; tanpa ini pembatas per-IP tidak berfungsi.', warnOnly: true);
+        $this->check('File .env tertutup', PHP_OS_FAMILY === 'Windows' || !is_file(base_path('.env')) || (fileperms(base_path('.env')) & 0o007) === 0, PHP_OS_FAMILY === 'Windows' ? 'dilewati' : substr(sprintf('%o', @fileperms(base_path('.env'))), -4), 'Jalankan: chmod 600 .env', warnOnly: true);
+
         // ── Email ─────────────────────────────────────────────────
         $mailer = (string) config('mail.default');
         $this->check('Pengirim email aktif', !in_array($mailer, ['log', 'array'], true), $mailer, 'MAIL_MAILER=log/array berarti email tidak pernah terkirim.');
@@ -68,6 +75,10 @@ class Preflight extends Command
         $tool = $converter->detect();
         $this->check('Konverter PDF (pdftoppm)', $tool !== null, $tool['engine'] ?? 'tidak ditemukan', 'Pasang poppler-utils (apt install poppler-utils) atau isi PDF_CONVERTER_PATH.');
         $this->check('pdftotext (cari & daftar isi)', $indexer->pdftotextPath() !== null, $indexer->pdftotextPath() ? 'ada' : 'tidak ditemukan', 'Ikut terpasang bersama poppler-utils.', warnOnly: true);
+
+        $toBytes = fn ($v) => (int) $v * match (strtolower(substr(trim((string) $v), -1))) { 'g' => 1024 ** 3, 'm' => 1024 ** 2, 'k' => 1024, default => 1 };
+        $upload = min($toBytes(ini_get('upload_max_filesize')), $toBytes(ini_get('post_max_size')));
+        $this->check('Batas unggahan PHP', $upload >= 64 * 1024 ** 2, ini_get('upload_max_filesize') . ' / post ' . ini_get('post_max_size'), 'Naikkan upload_max_filesize & post_max_size (mis. 512M) di CloudPanel → PHP Settings, dan client_max_body_size di Vhost. Foto HP & PDF buku bisa besar. (Nilai ini dari PHP CLI; cek juga PHP-FPM.)', warnOnly: true);
 
         // ── Penyimpanan ───────────────────────────────────────────
         // file_exists, bukan is_dir: junction Windows terbaca is_dir() = false.

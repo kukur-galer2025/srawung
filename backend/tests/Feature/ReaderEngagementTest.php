@@ -271,10 +271,10 @@ class ReaderEngagementTest extends TestCase
         $user = $this->user(verified: false);
         Sanctum::actingAs($user);
 
-        $this->putJson('/api/profile', ['name' => 'Budi', 'whatsapp' => '0812', 'email' => 'benar@contoh.id'])
+        $this->putJson('/api/profile', ['name' => 'Budi', 'whatsapp' => '081234567890', 'email' => 'benar@contoh.id'])
             ->assertStatus(422)->assertJsonValidationErrors('current_password');
 
-        $this->putJson('/api/profile', ['name' => 'Budi', 'whatsapp' => '0812', 'email' => 'benar@contoh.id', 'current_password' => 'password123'])
+        $this->putJson('/api/profile', ['name' => 'Budi', 'whatsapp' => '081234567890', 'email' => 'benar@contoh.id', 'current_password' => 'password123'])
             ->assertOk()->assertJson(['email_changed' => true]);
         $this->assertSame('benar@contoh.id', $user->fresh()->email);
         $this->assertNull($user->fresh()->email_verified_at);

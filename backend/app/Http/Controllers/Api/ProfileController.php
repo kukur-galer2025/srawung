@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Rules\SafeName;
+use App\Rules\StrongPassword;
 use App\Services\AccountService;
+use App\Services\Security\LoginSession;
+use App\Services\Security\SecurityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -20,13 +24,15 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
+        $request->merge(['whatsapp' => preg_replace('/[^0-9+]/', '', is_string($request->input('whatsapp')) ? $request->input('whatsapp') : '')]);
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'whatsapp' => 'required|string|max:20',
-            'email' => ['sometimes', 'required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'current_password' => 'nullable|string',
-            'password' => 'nullable|string|min:8|confirmed',
+            'name' => ['required', 'string', new SafeName],
+            'whatsapp' => ['required', 'string', 'max:20', 'regex:/^(\+?62|0)8[0-9]{7,12}$/'],
+            'email' => ['sometimes', 'required', 'string', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'current_password' => 'nullable|string|max:200',
+            'password' => ['nullable', 'string', 'confirmed', new StrongPassword($user->email)],
         ], [
+            'whatsapp.regex' => 'Nomor WhatsApp tidak valid. Contoh: 081234567890.',
             'email.unique' => 'Email ini sudah dipakai akun lain.',
             'email.email' => 'Format email tidak valid.',
         ]);
@@ -40,7 +46,8 @@ class ProfileController extends Controller
 
         // Mengganti email atau kata sandi wajib menyertakan kata sandi saat ini.
         if ($emailChanged || !empty($data['password'])) {
-            if (empty($data['current_password']) || !Hash::check($data['current_password'], $user->password)) {
+            if (empty($data['current_password']) || !$user->password || !Hash::check($data['current_password'], $user->password)) {
+                SecurityLog::record('profile.wrong_password', $user);
                 throw ValidationException::withMessages([
                     'current_password' => 'Kata sandi saat ini tidak cocok.',
                 ]);
@@ -56,9 +63,22 @@ class ProfileController extends Controller
             $user->email_verified_at = null;
         }
 
+        $oldEmail = $user->getOriginal('email');
         $user->name = $data['name'];
         $user->whatsapp = $data['whatsapp'];
         $user->save();
+
+        // Sandi/email berganti → perangkat lain dikeluarkan & pemilik lama diberi tahu.
+        if (!empty($data['password']) || $emailChanged) {
+            $current = $user->currentAccessToken();
+            LoginSession::revokeAll($user, $current instanceof \Laravel\Sanctum\PersonalAccessToken ? $current->id : null);
+            SecurityLog::record($emailChanged ? 'email.changed' : 'password.changed', $user);
+            if ($emailChanged) {
+                \Illuminate\Support\Facades\Notification::route('mail', $oldEmail)->notify(new \App\Notifications\SecurityNotice('Email akun Srawung diganti', ['Email akun Srawung Anda diganti ke alamat lain. Semua perangkat lain sudah dikeluarkan.']));
+            } else {
+                SecurityLog::notify($user, 'Kata sandi diubah', ['Kata sandi akun Srawung Anda baru saja diubah. Semua perangkat lain sudah dikeluarkan.']);
+            }
+        }
 
         if ($emailChanged) {
             try {
@@ -93,7 +113,7 @@ class ProfileController extends Controller
             $request->validate(['confirmation' => 'required|in:HAPUS'], ['confirmation.in' => 'Ketik HAPUS (huruf besar) untuk mengonfirmasi.', 'confirmation.required' => 'Ketik HAPUS untuk mengonfirmasi.']);
         } else {
             $request->validate(['password' => 'required|string'], ['password.required' => 'Masukkan kata sandi untuk mengonfirmasi.']);
-            if (!Hash::check($request->password, $user->password)) {
+            if (!$user->password || !Hash::check($request->password, $user->password)) {
                 throw ValidationException::withMessages(['password' => 'Kata sandi tidak cocok.']);
             }
         }

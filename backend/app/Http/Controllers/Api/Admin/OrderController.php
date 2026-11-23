@@ -73,9 +73,15 @@ class OrderController extends Controller
             return response()->json(['message' => 'File bukti tidak ditemukan.'], 404);
         }
 
+        // Jenis file ditetapkan server; selain gambar/PDF selalu diunduh, tidak pernah ditampilkan.
+        $types = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'pdf' => 'application/pdf'];
+        $type = $types[strtolower(pathinfo($proof->file_path, PATHINFO_EXTENSION))] ?? 'application/octet-stream';
+
         return \Illuminate\Support\Facades\Storage::disk('local')->response($proof->file_path, null, [
+            'Content-Type' => $type,
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
             'Cache-Control' => 'private, no-store',
-        ]);
+        ], $type === 'application/octet-stream' ? 'attachment' : 'inline');
     }
 
     public function invoice($id)

@@ -10,6 +10,7 @@ use App\Notifications\PayoutRequested;
 use App\Services\CreatorLedger;
 use App\Services\CreatorTerms;
 use App\Services\OrderLifecycle;
+use App\Services\Security\SecurityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -74,7 +75,20 @@ class DashboardController extends Controller
         ], ['payout_account.regex' => 'Nomor rekening/e-wallet hanya berisi angka.']);
 
         $profile = $request->user()->creatorProfile()->firstOrCreate([], ['display_name' => $request->user()->name]);
-        $profile->update($data);
+        $hadAccount = $profile->hasPayoutAccount();
+        $profile->fill($data);
+        $accountChanged = $profile->isDirty(['payout_method', 'payout_provider', 'payout_account', 'payout_holder']);
+        if ($accountChanged && $hadAccount) {
+            // Rekening diganti → penarikan ditahan sementara, agar pembajak akun tidak bisa langsung menguras saldo.
+            $profile->payout_changed_at = now();
+        }
+        $profile->save();
+        if ($accountChanged) {
+            SecurityLog::record('creator.payout_account', $request->user());
+            if ($hadAccount) {
+                SecurityLog::notify($request->user(), 'Rekening pencairan Anda diganti', ['Rekening/e-wallet pencairan di akun kreator Anda baru saja diganti. Penarikan ditahan ' . config('amania.security.payout_cooldown_hours') . ' jam demi keamanan.']);
+            }
+        }
 
         return response()->json(['message' => 'Profil kreator disimpan.', 'profile' => $profile]);
     }
@@ -117,6 +131,10 @@ class DashboardController extends Controller
         }
         if (!$profile->hasPayoutAccount()) {
             return response()->json(['message' => 'Lengkapi rekening atau e-wallet pencairan terlebih dahulu.'], 422);
+        }
+        $readyAt = $profile->payout_changed_at?->copy()->addHours((int) config('amania.security.payout_cooldown_hours'));
+        if ($readyAt?->isFuture()) {
+            return response()->json(['message' => 'Rekening pencairan baru saja diganti. Demi keamanan, penarikan bisa diajukan lagi setelah ' . $readyAt->timezone('Asia/Jakarta')->locale('id')->translatedFormat('d F Y, H:i') . ' WIB.'], 422);
         }
 
         $payout = DB::transaction(function () use ($user, $profile, $data) {

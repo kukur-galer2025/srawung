@@ -161,8 +161,14 @@ export default function GoogleLoginButton({ text = 'continue_with', onSuccess }:
   }, [text]);
 
   // Fallback alur OAuth redirect (bila skrip Google diblokir ekstensi/jaringan).
-  const redirectToGoogle = () => {
-    window.location.href = `${API_URL}/auth/google/redirect`;
+  // Verifier rahasia disimpan di tab ini; hanya sidik jarinya yang dikirim. Tanpa verifier, kode
+  // hasil login tidak bisa ditukar orang lain (PKCE).
+  const redirectToGoogle = async () => {
+    const hex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const verifier = hex(crypto.getRandomValues(new Uint8Array(32)));
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+    sessionStorage.setItem('google_verifier', verifier);
+    window.location.href = `${API_URL}/auth/google/redirect?challenge=${hex(digest)}`;
   };
 
   return (

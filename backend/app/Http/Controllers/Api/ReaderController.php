@@ -59,11 +59,11 @@ class ReaderController extends Controller
         $session = ReadingSession::create([
             'user_id' => $user->id,
             'book_id' => $book->id,
-            'session_token' => $sessionToken,
+            'session_token' => ReadingSession::hashToken($sessionToken),
             'started_at' => Carbon::now(),
             'last_seen_at' => Carbon::now(),
             'ip_address' => $request->ip() ?: '127.0.0.1',
-            'device' => $request->header('User-Agent'),
+            'device' => mb_substr((string) $request->userAgent(), 0, 250),
             'is_active' => true,
         ]);
 
@@ -90,13 +90,14 @@ class ReaderController extends Controller
 
     public function getPage(Request $request, $bookSlug, $pageNumber)
     {
-        $token = $request->bearerToken() ?: $request->query('token');
+        // Hanya lewat header: token di alamat (?token=) akan tercatat di log server & riwayat peramban.
+        $token = $request->bearerToken();
         if (!$token) {
             return response()->json(['message' => 'Sesi baca tidak valid.'], 401);
         }
 
         $session = ReadingSession::with(['user', 'book'])
-            ->where('session_token', $token)
+            ->where('session_token', ReadingSession::hashToken($token))
             ->first();
 
         if (!$session) {
@@ -117,6 +118,15 @@ class ReaderController extends Controller
         }
 
         $user = $session->user;
+        if (!$user || $user->is_blocked) {
+            $session->update(['is_active' => false, 'ended_reason' => 'blocked']);
+
+            return response()->json(['message' => 'Akun Anda diblokir. Hubungi admin Srawung.', 'code' => 'blocked'], 403);
+        }
+        $pageNumber = (int) $pageNumber;
+        if ($pageNumber < 1 || ($book->total_pages && $pageNumber > $book->total_pages)) {
+            return response()->json(['message' => 'Halaman tidak ditemukan.'], 404);
+        }
 
         // Cek kembali status perpustakaan
         $hasAccess = UserLibrary::where('user_id', $user->id)
@@ -295,6 +305,7 @@ class ReaderController extends Controller
 
         $library = UserLibrary::where('user_id', $user->id)
             ->where('book_id', $book->id)
+            ->where('access_status', 'active')
             ->firstOrFail();
 
         $library->update([

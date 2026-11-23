@@ -222,7 +222,7 @@ function PaidModal({ payout, onClose, onDone }: { payout: PayoutRow; onClose: ()
         <Field label="No. referensi transfer (opsional)">
           <Input value={reference} onChange={(e) => setReference(e.target.value)} maxLength={120} placeholder="mis. 2611181234" />
         </Field>
-        <Field label="Bukti transfer (opsional)" hint="JPG, PNG, atau PDF · maks. 5 MB">
+        <Field label="Bukti transfer (opsional)" hint="JPG, PNG, atau PDF · maks. 20 MB">
           <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={(e) => setProof(e.target.files?.[0] ?? null)} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium" />
         </Field>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">

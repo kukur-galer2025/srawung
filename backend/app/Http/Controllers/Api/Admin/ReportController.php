@@ -100,6 +100,12 @@ class ReportController extends Controller
         ]);
     }
 
+    /** Sel yang diawali = + - @ dianggap rumus oleh Excel; tanda petik membuatnya tetap teks biasa. */
+    private static function csvSafe(mixed $value): mixed
+    {
+        return is_string($value) && preg_match('/^[=+\-@\t\r]/', $value) && $value !== '-' ? "'" . $value : $value;
+    }
+
     public function export(Request $request)
     {
         $query = Order::with(['user', 'orderItems.book'])
@@ -136,7 +142,7 @@ class ReportController extends Controller
             foreach ($orders as $order) {
                 $bookTitles = $order->orderItems->map(fn($item) => $item->book?->title ?: 'Buku tidak ditemukan')->implode('; ');
 
-                fputcsv($handle, [
+                fputcsv($handle, array_map(self::csvSafe(...), [
                     $order->order_number,
                     $order->confirmed_at ? $order->confirmed_at->format('Y-m-d H:i:s') : '-',
                     $order->user?->name ?: '-',
@@ -148,7 +154,7 @@ class ReportController extends Controller
                     self::sourceOf($order),
                     $order->utm_medium ?: '-',
                     $order->utm_campaign ?: '-',
-                ]);
+                ]));
             }
 
             fclose($handle);

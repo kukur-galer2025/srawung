@@ -19,7 +19,16 @@ const BTN_TONE: Record<Tone, string> = {
 };
 const BTN_CANCEL = 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-visible:ring-slate-400/30';
 
-const ICON: Record<Tone, SweetAlertIcon> = { primary: 'question', danger: 'warning', success: 'question' };
+const ICON: Record<Tone, SweetAlertIcon> = { primary: 'question', danger: 'warning', success: 'success' };
+
+const SVG = (path: string) =>
+  `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+/** Ikon garis (gaya lucide) di dalam lingkaran berwarna lembut. */
+const ICON_HTML: Record<Tone, string> = {
+  primary: SVG('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>'),
+  danger: SVG('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/>'),
+  success: SVG('<path d="M20 6 9 17l-5-5"/>'),
+};
 
 const base = Swal.mixin({
   buttonsStyling: false,
@@ -48,12 +57,13 @@ export async function confirmDialog({ title, text, confirmText = 'Ya, lanjutkan'
     title,
     text,
     icon: ICON[tone],
-    iconColor: tone === 'danger' ? '#e11d48' : tone === 'success' ? '#059669' : '#1d4ed8',
+    iconHtml: ICON_HTML[tone],
     showCancelButton: true,
     confirmButtonText: confirmText,
     cancelButtonText: cancelText,
     customClass: {
       popup: 'amania-swal',
+      icon: `amania-swal-icon amania-swal-icon-${tone}`,
       title: 'amania-swal-title',
       htmlContainer: 'amania-swal-text',
       actions: 'amania-swal-actions',

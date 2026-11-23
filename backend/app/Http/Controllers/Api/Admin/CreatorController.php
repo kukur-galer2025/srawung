@@ -86,18 +86,22 @@ class CreatorController extends Controller
     {
         $data = $request->validate([
             'reference' => 'nullable|string|max:120',
-            'proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
+            'proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:20480',
         ]);
         $payout = CreatorPayout::where('status', 'requested')->findOrFail($id);
         $path = $request->hasFile('proof') ? $request->file('proof')->store("payouts/{$payout->id}", 'local') : null;
 
-        $payout->update([
+        // Klaim atomik: dua klik bersamaan tidak memproses pengajuan yang sama dua kali.
+        $claimed = CreatorPayout::whereKey($payout->id)->where('status', 'requested')->update([
             'status' => 'paid',
             'reference' => $data['reference'] ?? null,
             'proof_path' => $path,
             'processed_by' => $request->user()->id,
             'processed_at' => now(),
         ]);
+        abort_unless($claimed, 409, 'Pengajuan ini sudah diproses.');
+        $payout->refresh();
+        \App\Services\Security\SecurityLog::record('payout.paid', $request->user(), ['payout' => $payout->id, 'amount' => (int) $payout->amount]);
         $this->notify($payout);
 
         return response()->json(['message' => 'Penarikan ditandai sudah dibayar. Kreator menerima email konfirmasi.']);
@@ -107,7 +111,10 @@ class CreatorController extends Controller
     {
         $data = $request->validate(['note' => 'required|string|max:500']);
         $payout = CreatorPayout::where('status', 'requested')->findOrFail($id);
-        $payout->update(['status' => 'rejected', 'note' => $data['note'], 'processed_by' => $request->user()->id, 'processed_at' => now()]);
+        $claimed = CreatorPayout::whereKey($payout->id)->where('status', 'requested')
+            ->update(['status' => 'rejected', 'note' => $data['note'], 'processed_by' => $request->user()->id, 'processed_at' => now()]);
+        abort_unless($claimed, 409, 'Pengajuan ini sudah diproses.');
+        $payout->refresh();
         $this->notify($payout);
 
         return response()->json(['message' => 'Pengajuan ditolak. Saldo dikembalikan ke kreator.']);
@@ -118,7 +125,7 @@ class CreatorController extends Controller
         $payout = CreatorPayout::findOrFail($id);
         abort_unless($payout->proofExists(), 404);
 
-        return Storage::disk('local')->response($payout->proof_path, null, ['Cache-Control' => 'private, no-store']);
+        return Storage::disk('local')->response($payout->proof_path, null, ['Content-Security-Policy' => "default-src 'none'; sandbox", 'Cache-Control' => 'private, no-store']);
     }
 
     private function notify(CreatorPayout $payout): void

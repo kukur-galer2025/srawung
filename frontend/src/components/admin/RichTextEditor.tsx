@@ -64,7 +64,7 @@ import { promptDialog, toast } from '@/lib/dialog';
  * Hasilnya HTML; server tetap menyanitasi ulang sebelum disimpan & ditampilkan.
  */
 
-const MAX_IMAGE_MB = 5;
+const MAX_IMAGE_MB = 20;
 
 async function uploadImage(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('File harus berupa gambar.');

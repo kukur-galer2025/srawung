@@ -13,6 +13,14 @@ class BookController extends Controller
 {
     public function index(Request $request, CatalogSearch $catalog)
     {
+        $request->validate([
+            'search' => 'nullable|string|max:120',
+            'category' => 'nullable|string|max:120',
+            'sort' => 'nullable|string|max:30',
+            'ids' => 'nullable|string|max:400',
+            'price_min' => 'nullable|numeric',
+            'price_max' => 'nullable|numeric',
+        ]);
         $query = Book::with('category')->where('status', 'published');
 
         if ($request->filled('category')) {
@@ -119,7 +127,7 @@ class BookController extends Controller
         $previewPages = $book->pages()
             ->where('page_number', '<=', $previewPagesLimit)
             ->orderBy('page_number', 'asc')
-            ->get(['id', 'book_id', 'page_number', 'image_path']);
+            ->get(['id', 'book_id', 'page_number']);
 
         $isOwned = false;
         $user = Auth::guard('sanctum')->user() ?: $request->user();

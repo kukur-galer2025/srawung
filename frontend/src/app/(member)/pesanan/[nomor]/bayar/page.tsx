@@ -61,7 +61,7 @@ interface PaymentInfo {
   whatsapp_admin: string;
 }
 
-const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_SIZE = 20 * 1024 * 1024;
 const ACCEPT = ['image/jpeg', 'image/png', 'application/pdf'];
 
 function useCountdown(deadline?: string) {
@@ -153,7 +153,7 @@ export default function OrderPaymentPage({ params }: { params: Promise<{ nomor: 
     setUploadError(null);
     if (!f) return;
     if (!ACCEPT.includes(f.type)) return setUploadError('Format harus JPG, PNG, atau PDF.');
-    if (f.size > MAX_SIZE) return setUploadError('Ukuran file maksimal 5 MB.');
+    if (f.size > MAX_SIZE) return setUploadError('Ukuran file maksimal 20 MB.');
     setFile(f);
     setPreviewUrl(f.type.startsWith('image/') ? URL.createObjectURL(f) : null);
   };
@@ -349,7 +349,7 @@ export default function OrderPaymentPage({ params }: { params: Promise<{ nomor: 
                         <UploadCloud className="h-6 w-6 text-blue-700" />
                       </span>
                       <span className="text-sm font-semibold text-slate-900">Klik atau seret file ke sini</span>
-                      <span className="mt-1 text-xs text-slate-500">JPG, PNG, atau PDF · maks. 5 MB</span>
+                      <span className="mt-1 text-xs text-slate-500">JPG, PNG, atau PDF · maks. 20 MB</span>
                     </>
                   )}
                 </label>

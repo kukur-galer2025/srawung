@@ -26,6 +26,9 @@ Schedule::call(fn () => \Illuminate\Support\Facades\DB::table('search_query_dail
     ->daily()
     ->name('prune-search-log');
 
+// Buang token login kedaluwarsa & rapikan sesi baca lama.
+Schedule::command('sanctum:prune-expired --hours=24')->daily();
+
 // Pemantauan: email ke admin bila worker macet, disk hampir penuh, dll.
 Schedule::command('amania:health-check --silent-ok')
     ->everyFiveMinutes()

@@ -41,17 +41,18 @@ class ErrorAlert
             return;
         }
 
-        self::send("Error di {$source}", Str::limit($message, 300), $where, md5($source . '|' . $message));
+        // Laporan peramban bisa dipalsukan siapa saja → jatah terpisah & kecil, supaya tidak menghabiskan jatah alarm server.
+        self::send("Error di {$source}", Str::limit($message, 300), $where, md5($source . '|' . $message), 'client', 3);
     }
 
-    private static function send(string $what, string $message, ?string $where, string $fingerprint): void
+    private static function send(string $what, string $message, ?string $where, string $fingerprint, string $bucket = 'server', int $perHour = 10): void
     {
         if (!Cache::add("error-alert:{$fingerprint}", true, now()->addHour())) {
             return;
         }
-        $hourKey = 'error-alert:count:' . now()->format('YmdH');
+        $hourKey = "error-alert:count:{$bucket}:" . now()->format('YmdH');
         Cache::add($hourKey, 0, now()->addHours(2));
-        if (Cache::increment($hourKey) > 10) {
+        if (Cache::increment($hourKey) > $perHour) {
             return;
         }
 

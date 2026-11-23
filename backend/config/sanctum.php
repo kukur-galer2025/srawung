@@ -45,7 +45,9 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Batas paling lama (menit) untuk SEMUA token, termasuk token lama. Bawaan 30 hari.
+    // Admin & kreator lebih pendek — lihat config/amania.php → security.
+    'expiration' => (int) env('SANCTUM_EXPIRATION', 60 * 24 * 30),
 
     /*
     |--------------------------------------------------------------------------

@@ -33,9 +33,18 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery',
+        'two_factor_confirmed_at',
+        'two_factor_last_step',
     ];
 
-    protected $appends = ['has_password'];
+    protected $appends = ['has_password', 'two_factor_enabled'];
+
+    public function getTwoFactorEnabledAttribute(): bool
+    {
+        return !empty($this->attributes['two_factor_confirmed_at'] ?? null);
+    }
 
     public function getHasPasswordAttribute(): bool
     {
@@ -56,6 +65,10 @@ class User extends Authenticatable implements MustVerifyEmail
             'preferred_categories' => 'array',
             'anonymized_at' => 'datetime',
             'reminder_emails' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_last_step' => 'integer',
         ];
     }
 

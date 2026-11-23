@@ -20,11 +20,11 @@ class NewBookReport extends AmaniaMailNotification
 
         $mail = $this->baseMessage("Laporan buku: {$type} — " . str($r->book?->title)->limit(50))
             ->greeting('Ada laporan konten baru')
-            ->line("Buku: **{$r->book?->title}**")
-            ->line("Jenis: {$type} · Pelapor: {$r->reporter_name} (" . (BookReport::RELATIONSHIPS[$r->relationship] ?? $r->relationship) . ", {$r->reporter_email})")
-            ->line('> ' . trim(preg_replace('/\s+/', ' ', str($r->description)->limit(600))));
+            ->line("Buku: **{$this->md($r->book?->title)}**")
+            ->line("Jenis: {$type} · Pelapor: {$this->md($r->reporter_name)} (" . (BookReport::RELATIONSHIPS[$r->relationship] ?? $r->relationship) . ", {$r->reporter_email})")
+            ->line('> ' . $this->md(trim(preg_replace('/\s+/', ' ', str($r->description)->limit(600)))));
         if ($r->evidence_url) {
-            $mail->line("Bukti: {$r->evidence_url}");
+            $mail->line('Bukti (tautan dari pelapor, buka dengan hati-hati): ' . $this->md($r->evidence_url));
         }
 
         return $mail->action('Tinjau laporan', $this->frontendUrl('admin/laporan-konten'))

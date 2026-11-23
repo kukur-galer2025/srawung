@@ -39,6 +39,9 @@ class ClientErrorController extends Controller
             'digest' => 'nullable|string|max:100',
         ]);
 
+        // Buang baris baru/karakter kendali agar laporan palsu tidak bisa menyisipkan baris log tiruan.
+        $data['message'] = trim(preg_replace('/[\x00-\x1F\x7F]+/', ' ', $data['message']));
+
         $haystack = $data['message'] . ' ' . ($data['stack'] ?? '');
         foreach (self::IGNORE as $pattern) {
             if (str_contains($haystack, $pattern)) {
@@ -47,7 +50,7 @@ class ClientErrorController extends Controller
         }
 
         // Hanya path halaman (tanpa query string yang bisa memuat data pribadi).
-        $path = $data['url'] ? (parse_url($data['url'], PHP_URL_PATH) ?: null) : null;
+        $path = !empty($data['url']) ? (parse_url($data['url'], PHP_URL_PATH) ?: null) : null;
         $source = $data['source'] ?? 'browser';
 
         Log::warning("Frontend error ({$source}): " . Str::limit($data['message'], 500), [

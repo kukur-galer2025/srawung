@@ -26,6 +26,9 @@ use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
+    /** Pesanan belum dibayar per akun (mencegah banjir pesanan & pengurasan kuota kupon). */
+    private const MAX_PENDING = 10;
+
     public function index(Request $request)
     {
         // Pastikan status akurat walau scheduler sedang tidak berjalan.
@@ -71,14 +74,21 @@ class OrderController extends Controller
             'book_ids.*' => 'integer',
             'bundle_ids' => 'nullable|array|max:20',
             'bundle_ids.*' => 'integer',
+            'items' => 'nullable|array|max:100',
+            'coupon_code' => 'nullable|string|max:50',
+            'attribution' => 'nullable|array',
         ]);
+
+        if (Order::where('user_id', $user->id)->where('status', 'menunggu_pembayaran')->where('payment_deadline', '>', now())->count() >= self::MAX_PENDING) {
+            return response()->json(['message' => 'Anda masih punya ' . self::MAX_PENDING . ' pesanan yang belum dibayar. Selesaikan salah satunya terlebih dahulu.'], 422);
+        }
 
         $attribution = $this->attribution($request);
 
         // Kompatibel dengan format lama: items: [{id}] atau [id].
         $bookIds = (array) $request->input('book_ids', []);
         if (empty($bookIds) && $request->has('items')) {
-            $bookIds = array_map(fn ($item) => is_array($item) ? ($item['id'] ?? $item['book_id']) : $item, (array) $request->input('items'));
+            $bookIds = array_map(fn ($item) => (int) (is_array($item) ? ($item['id'] ?? $item['book_id'] ?? 0) : (is_scalar($item) ? $item : 0)), (array) $request->input('items'));
         }
         $bundleIds = (array) $request->input('bundle_ids', []);
 
@@ -270,7 +280,7 @@ class OrderController extends Controller
     public function uploadProof(Request $request, $id)
     {
         $request->validate([
-            'proof' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
+            'proof' => 'required|file|mimes:jpg,jpeg,png,pdf|max:20480',
             'buyer_note' => 'nullable|string|max:1000',
         ]);
 
@@ -285,20 +295,50 @@ class OrderController extends Controller
             ], 422);
         }
 
-        if (!in_array($order->status, ['menunggu_pembayaran', 'ditolak'])) {
+        if (!in_array($order->status, OrderLifecycle::EXPIRABLE, true)) {
             return response()->json(['message' => 'Status pesanan saat ini tidak memungkinkan upload bukti.'], 400);
         }
 
+        // Ekstensi dari ISI file, bukan dari nama yang dikirim pengunggah.
         $file = $request->file('proof');
-        $fileName = 'proof_' . time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
-        $filePath = $file->storeAs("proofs/{$order->id}", $fileName, 'local');
+        $extension = $file->extension();
+        abort_unless(in_array($extension, ['jpg', 'jpeg', 'png', 'pdf'], true), 422, 'Bukti harus berupa gambar JPG/PNG atau PDF.');
+        if ($extension !== 'pdf') {
+            \App\Support\ImageGuard::assertSafe($file->getRealPath(), 'proof');
+        }
+        $filePath = $file->storeAs("proofs/{$order->id}", 'proof_' . time() . '_' . Str::random(10) . '.' . $extension, 'local');
 
-        $paymentProof = PaymentProof::create([
-            'order_id' => $order->id,
-            'file_path' => $filePath,
-            'buyer_note' => $request->buyer_note,
-            'status' => 'pending',
-        ]);
+        // Baris pesanan dikunci: unggahan yang bersamaan dengan konfirmasi admin tidak bisa
+        // mengembalikan pesanan yang sudah lunas/kedaluwarsa ke status menunggu verifikasi.
+        $previousStatus = null;
+        $paymentProof = DB::transaction(function () use ($order, $filePath, $request, &$previousStatus) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+            if (!in_array($locked->status, OrderLifecycle::EXPIRABLE, true)) {
+                return null;
+            }
+            $previousStatus = $locked->status;
+            $proof = PaymentProof::create([
+                'order_id' => $locked->id,
+                'file_path' => $filePath,
+                'buyer_note' => $request->buyer_note,
+                'status' => 'pending',
+            ]);
+            $locked->update(['status' => 'menunggu_verifikasi']);
+            OrderStatusLog::create([
+                'order_id' => $locked->id,
+                'from_status' => $previousStatus,
+                'to_status' => 'menunggu_verifikasi',
+                'actor_id' => $request->user()->id,
+            ]);
+
+            return $proof;
+        });
+        if (!$paymentProof) {
+            Storage::disk('local')->delete($filePath);
+
+            return response()->json(['message' => 'Status pesanan saat ini tidak memungkinkan upload bukti.'], 400);
+        }
+        $order->refresh();
 
         // Deteksi bukti yang dipakai ulang untuk pesanan lain (peringatan untuk admin).
         try {
@@ -306,16 +346,6 @@ class OrderController extends Controller
         } catch (\Throwable $e) {
             report($e);
         }
-
-        $previousStatus = $order->status;
-        $order->update(['status' => 'menunggu_verifikasi']);
-
-        OrderStatusLog::create([
-            'order_id' => $order->id,
-            'from_status' => $previousStatus,
-            'to_status' => 'menunggu_verifikasi',
-            'actor_id' => $request->user()->id,
-        ]);
 
         // Email tanda terima ke pembeli (diantrekan, tidak memperlambat respons).
         try {

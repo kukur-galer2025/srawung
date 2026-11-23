@@ -19,6 +19,10 @@ class NewsletterController extends Controller
 
         $user = $request->user('sanctum');
         $result = EmailPreferences::subscribe($data['email'], $user, 'footer');
+        // Tamu tidak perlu tahu apakah sebuah email sudah terdaftar; hanya pemiliknya yang diberi tahu.
+        if ($result['status'] === 'already' && strtolower((string) $user?->email) !== strtolower($data['email'])) {
+            $result['status'] = 'pending';
+        }
 
         return response()->json([
             'status' => $result['status'],

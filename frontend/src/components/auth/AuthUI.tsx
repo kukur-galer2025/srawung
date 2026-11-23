@@ -204,7 +204,8 @@ export function PasswordStrength({ password }: { password: string }) {
 /* Redirect aman setelah login                                        */
 /* ------------------------------------------------------------------ */
 export function resolveRedirect(target: string | null, role: 'buyer' | 'creator' | 'admin'): string {
-  const safe = target && target.startsWith('/') && !target.startsWith('//') ? target : null;
+  // Hanya path di situs ini. "//situs" dan "/\situs" dibaca peramban sebagai alamat situs lain.
+  const safe = target && /^\/(?![/\\])[^\\\x00-\x1f]*$/.test(target) ? target : null;
   if (role === 'admin') return safe?.startsWith('/admin') ? safe : '/admin';
   // Tujuan yang bukan wilayah role ini diabaikan (pembeli tidak diarahkan ke /admin atau /kreator).
   const forbidden = ['/admin', '/masuk', '/daftar', ...(role === 'creator' ? [] : ['/kreator'])];

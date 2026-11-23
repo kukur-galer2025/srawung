@@ -17,6 +17,8 @@ class PdfPageConverter
 {
     private const PAGE_WIDTH = 1300; // piksel
     private const TIMEOUT = 1800;    // detik
+    private const MAX_PAGES = 3000;
+    private const MAX_RATIO = 6;     // sisi panjang ÷ sisi pendek; halaman ekstrem menghabiskan memori server
 
     /**
      * @return array{engine: 'poppler'|'ghostscript', path: string}|null
@@ -58,7 +60,7 @@ class PdfPageConverter
 
             $path = str_replace(['\\', '(', ')'], ['/', '\\(', '\\)'], $pdfPath);
             $out = Process::timeout(60)->run([
-                $tool['path'], '-q', '-dNODISPLAY', '-dNOSAFER', '-dQUIET',
+                $tool['path'], '-q', '-dNODISPLAY', '-dSAFER', "--permit-file-read={$path}", '-dQUIET',
                 '-c', "({$path}) (r) file runpdfbegin pdfpagecount = quit",
             ]);
             $n = (int) trim($out->output());
@@ -86,6 +88,7 @@ class PdfPageConverter
             );
         }
 
+        $this->assertReasonable($tool, $pdfPath);
         File::ensureDirectoryExists($outputDir);
 
         $command = $tool['engine'] === 'poppler'
@@ -141,6 +144,38 @@ class PdfPageConverter
         }
 
         return $pages;
+    }
+
+    /**
+     * Tolak PDF yang sengaja dibuat untuk menjatuhkan server: ribuan halaman atau halaman
+     * berukuran ekstrem (mis. 1 × 100.000 pt) yang mengembang jadi gambar raksasa.
+     */
+    private function assertReasonable(array $tool, string $pdfPath): void
+    {
+        if ($tool['engine'] !== 'poppler') {
+            return;
+        }
+        $dir = dirname($tool['path']);
+        $exe = PHP_OS_FAMILY === 'Windows' && str_ends_with(strtolower($tool['path']), '.exe') ? '.exe' : '';
+        $pdfinfo = $dir === '.' ? 'pdfinfo' : $dir . DIRECTORY_SEPARATOR . 'pdfinfo' . $exe;
+        try {
+            $out = Process::timeout(120)->run([$pdfinfo, '-f', '1', '-l', (string) (self::MAX_PAGES + 1), $pdfPath]);
+        } catch (\Throwable) {
+            throw new RuntimeException('PDF terlalu rumit untuk diperiksa. Simpan ulang PDF lalu unggah lagi.');
+        }
+        if (!$out->successful()) {
+            return; // rusak/terkunci → pesan jelasnya diberikan oleh proses konversi
+        }
+        if (preg_match('/^Pages:\s+(\d+)/m', $out->output(), $m) && (int) $m[1] > self::MAX_PAGES) {
+            throw new RuntimeException('PDF memiliki lebih dari ' . self::MAX_PAGES . ' halaman.');
+        }
+        preg_match_all('/^Page\s+(\d+)\s+size:\s+([\d.]+) x ([\d.]+)/m', $out->output(), $sizes, PREG_SET_ORDER);
+        foreach ($sizes as [, $page, $w, $h]) {
+            $short = min((float) $w, (float) $h);
+            if ($short < 1 || max((float) $w, (float) $h) / $short > self::MAX_RATIO) {
+                throw new RuntimeException("Ukuran halaman {$page} pada PDF tidak wajar ({$w} x {$h} pt).");
+            }
+        }
     }
 
     /** @return list<string> */

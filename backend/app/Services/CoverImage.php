@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ImageGuard;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -13,8 +14,8 @@ use Illuminate\Support\Str;
  * Gambar apa pun (JPG/PNG/WebP/GIF/BMP/AVIF) diputar sesuai EXIF, diperkecil ke
  * lebar maksimal 1200 px (cukup tajam untuk layar retina) lalu disimpan sebagai
  * WebP — biasanya 10–20× lebih kecil dari aslinya sehingga katalog cepat tampil.
- * Bila gambar tak bisa diolah (format tak dikenal GD, memori tak cukup), file asli
- * tetap disimpan apa adanya agar unggahan tidak pernah gagal karena konversi.
+ * Gambar yang tidak bisa diolah DITOLAK. File asli tidak pernah disimpan apa adanya di folder
+ * publik: file berkedok gambar (mis. berisi HTML/skrip) bisa dibuka orang lewat alamat situs.
  */
 class CoverImage
 {
@@ -23,26 +24,25 @@ class CoverImage
     public const QUALITY = 82;
 
     /** Simpan sampul unggahan di disk public; mengembalikan path relatif. */
-    public static function store(UploadedFile $file, string $dir = 'covers'): string
+    public static function store(UploadedFile $file, string $dir = 'covers', string $field = 'cover', int $maxWidth = self::MAX_WIDTH, int $maxHeight = self::MAX_HEIGHT, bool $lossless = false): string
     {
-        $webp = self::toWebp($file->getRealPath());
-        if ($webp !== null) {
-            $path = trim($dir, '/') . '/cover_' . now()->format('YmdHis') . '_' . Str::random(8) . '.webp';
-            Storage::disk('public')->put($path, $webp);
-
-            return $path;
+        ImageGuard::assertSafe($file->getRealPath(), $field);
+        $webp = self::toWebp($file->getRealPath(), $maxWidth, $maxHeight, $lossless);
+        if ($webp === null) {
+            throw \Illuminate\Validation\ValidationException::withMessages([$field => 'Gambar tidak dapat dibaca. Simpan ulang sebagai JPG, PNG, atau WebP lalu unggah lagi.']);
         }
 
-        $ext = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
+        $path = trim($dir, '/') . '/cover_' . now()->format('YmdHis') . '_' . Str::random(8) . '.webp';
+        Storage::disk('public')->put($path, $webp);
 
-        return $file->storeAs(trim($dir, '/'), 'cover_' . now()->format('YmdHis') . '_' . Str::random(8) . '.' . $ext, 'public');
+        return $path;
     }
 
     /**
      * Konversi file gambar menjadi WebP terkompresi. Mengembalikan isi biner,
      * atau null bila tidak bisa diolah.
      */
-    public static function toWebp(string $sourcePath): ?string
+    public static function toWebp(string $sourcePath, int $maxWidth = self::MAX_WIDTH, int $maxHeight = self::MAX_HEIGHT, bool $lossless = false): ?string
     {
         if (!function_exists('imagewebp') || !is_file($sourcePath)) {
             return null;
@@ -53,6 +53,9 @@ class CoverImage
             return null;
         }
         [$width, $height] = $info;
+        if (!ImageGuard::isSafe($sourcePath)) {
+            return null;
+        }
 
         // Gambar sangat besar butuh memori: ±5 byte/piksel untuk sumber + hasil.
         $needed = (int) ($width * $height * 5 + 64 * 1024 * 1024);
@@ -72,7 +75,7 @@ class CoverImage
             $width = imagesx($src);
             $height = imagesy($src);
 
-            $scale = min(1, self::MAX_WIDTH / $width, self::MAX_HEIGHT / $height);
+            $scale = min(1, $maxWidth / $width, $maxHeight / $height);
             $w = max(1, (int) round($width * $scale));
             $h = max(1, (int) round($height * $scale));
 
@@ -92,7 +95,7 @@ class CoverImage
             }
 
             ob_start();
-            $ok = imagewebp($out, null, self::QUALITY);
+            $ok = imagewebp($out, null, $lossless && defined('IMG_WEBP_LOSSLESS') ? IMG_WEBP_LOSSLESS : self::QUALITY);
             $data = (string) ob_get_clean();
 
             if ($out !== $src) {
@@ -203,7 +206,7 @@ class CoverImage
         $current = self::toBytes($limit);
         if ($bytes > $current) {
             // Batasi kenaikan agar satu unggahan tidak menghabiskan memori server.
-            @ini_set('memory_limit', (string) min($bytes, 2048 * 1024 * 1024));
+            @ini_set('memory_limit', (string) min($bytes, 512 * 1024 * 1024));
         }
     }
 

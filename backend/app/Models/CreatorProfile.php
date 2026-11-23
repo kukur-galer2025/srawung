@@ -9,11 +9,11 @@ class CreatorProfile extends Model
 {
     use \App\Models\Concerns\NormalizesTimezone;
 
-    protected $fillable = ['user_id', 'display_name', 'slug', 'bio', 'commission_percent', 'payout_method', 'payout_provider', 'payout_account', 'payout_holder', 'terms_version', 'terms_accepted_at'];
+    protected $fillable = ['user_id', 'display_name', 'slug', 'bio', 'commission_percent', 'payout_method', 'payout_provider', 'payout_account', 'payout_holder', 'terms_version', 'terms_accepted_at', 'payout_changed_at'];
 
     protected function casts(): array
     {
-        return ['commission_percent' => 'integer', 'terms_accepted_at' => 'datetime'];
+        return ['commission_percent' => 'integer', 'terms_accepted_at' => 'datetime', 'payout_changed_at' => 'datetime'];
     }
 
     /** Sudah menyetujui versi Syarat & Ketentuan Kreator yang berlaku? */

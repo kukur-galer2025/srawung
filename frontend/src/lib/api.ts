@@ -27,6 +27,12 @@ export async function fetchAPI(path: string, options: RequestInit = {}) {
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: 'Terjadi kesalahan' }));
+    // Sesi kedaluwarsa/dicabut → bersihkan token & beri tahu AuthContext (halaman privat mengarah ke /masuk).
+    if (res.status === 401 && typeof window !== 'undefined' && headers['Authorization'] && headers['Authorization'] === `Bearer ${localStorage.getItem('amania_token')}`) {
+      localStorage.removeItem('amania_token');
+      window.dispatchEvent(new Event('auth:expired'));
+      throw new Error('Sesi Anda sudah berakhir. Silakan masuk lagi.');
+    }
     throw new Error(error.message || error.error || 'Request failed');
   }
   return res.json();

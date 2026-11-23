@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { jsonLdHtml } from '@/lib/jsonld';
 import { notFound } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import { BookDetailClient, type BookDetailData } from './BookDetailClient';
@@ -76,7 +77,7 @@ export default async function BookDetailPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
 
       <nav aria-label="Breadcrumb" className="no-scrollbar mb-8 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-sm text-slate-500">
         <Link href="/" className="transition hover:text-slate-900">

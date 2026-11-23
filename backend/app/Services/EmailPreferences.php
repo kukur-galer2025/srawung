@@ -34,7 +34,7 @@ class EmailPreferences
         if (!$sub->exists) {
             $sub->token = NewsletterSubscriber::newToken();
         }
-        $sub->user_id ??= $user?->id ?? User::where('email', $email)->value('id');
+        $sub->user_id ??= ($user && strtolower($user->email) === $email) ? $user->id : User::where('email', $email)->value('id');
         $sub->source ??= $source;
 
         if ($sub->status === NewsletterSubscriber::SUBSCRIBED) {
@@ -50,11 +50,14 @@ class EmailPreferences
         }
 
         $sub->fill(['status' => NewsletterSubscriber::PENDING, 'unsubscribed_at' => null])->save();
-        try {
-            Notification::route('mail', $email)->notify(new NewsletterConfirm($sub));
-        } catch (\Throwable $e) {
-            report($e);
-        }
+        // Maksimal 3 email konfirmasi per alamat per hari (formulir publik, jangan bisa membanjiri orang lain).
+        \Illuminate\Support\Facades\RateLimiter::attempt('newsletter-mail:' . hash('sha256', $email), 3, function () use ($email, $sub) {
+            try {
+                Notification::route('mail', $email)->notify(new NewsletterConfirm($sub));
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }, 86400);
 
         return ['status' => 'pending', 'subscriber' => $sub];
     }

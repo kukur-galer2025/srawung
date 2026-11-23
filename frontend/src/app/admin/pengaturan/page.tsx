@@ -142,7 +142,7 @@ function QrisImagePanel({ url, onChanged }: { url: string | null; onChanged: () 
           {uploading ? 'Mengunggah…' : 'Ganti gambar QRIS'}
           <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => upload(e.target.files?.[0])} />
         </label>
-        <p className="text-xs text-slate-500">JPG, PNG, atau WebP · maks. 3 MB · pastikan kode QR terlihat tajam.</p>
+        <p className="text-xs text-slate-500">JPG, PNG, atau WebP · maks. 20 MB · pastikan kode QR terlihat tajam.</p>
         {message && <p className={`text-sm font-medium ${message.tone === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>{message.text}</p>}
       </div>
     </div>

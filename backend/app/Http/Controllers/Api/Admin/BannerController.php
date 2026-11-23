@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Banner;
+use App\Services\CoverImage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -36,8 +37,8 @@ class BannerController extends Controller
         $data = $this->validated($request);
 
         if ($request->hasFile('image')) {
+            $data['image_path'] = $this->storeImage($request); // simpan baru dulu, baru hapus yang lama
             $this->deleteImage($banner->image_path);
-            $data['image_path'] = $this->storeImage($request);
         } elseif ($request->boolean('remove_image')) {
             $this->deleteImage($banner->image_path);
             $data['image_path'] = null;
@@ -70,8 +71,9 @@ class BannerController extends Controller
             'is_active' => 'nullable|boolean',
             'starts_at' => 'nullable|date',
             'ends_at' => 'nullable|date|after:starts_at',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:20480',
         ], [
+            'image.max' => 'Ukuran gambar banner maksimal 20 MB.',
             'link_url.regex' => 'Tautan harus diawali "/" (halaman Srawung) atau "https://".',
             'ends_at.after' => 'Waktu selesai harus setelah waktu mulai.',
         ]);
@@ -85,7 +87,7 @@ class BannerController extends Controller
 
     private function storeImage(Request $request): ?string
     {
-        return $request->hasFile('image') ? $request->file('image')->store('banners', 'public') : null;
+        return $request->hasFile('image') ? CoverImage::store($request->file('image'), 'banners', 'image', 2000, 1400) : null;
     }
 
     private function deleteImage(?string $path): void

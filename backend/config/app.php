@@ -60,7 +60,9 @@ return [
     // Proxy/load balancer di depan aplikasi (Nginx lokal, Cloudflare, dll.) — agar IP
     // pembaca & HTTPS terdeteksi benar. Isi "*" bila semua lalu lintas lewat proxy
     // tepercaya, atau daftar IP dipisah koma. Kosong = tidak memercayai proxy.
-    'trusted_proxies' => env('TRUSTED_PROXIES'),
+    // Bawaan: proxy di server yang sama (Nginx/Varnish CloudPanel meneruskan dari 127.0.0.1). Tanpa ini
+    // semua pengunjung terbaca sebagai 127.0.0.1, sehingga pembatas per-IP & log akses tidak berguna.
+    'trusted_proxies' => env('TRUSTED_PROXIES') ?: '127.0.0.1,::1',
 
     /*
     |--------------------------------------------------------------------------

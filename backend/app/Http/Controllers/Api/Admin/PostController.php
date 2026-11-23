@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Post;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Services\CoverImage;
 use App\Services\HtmlSanitizer;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -33,7 +34,8 @@ class PostController extends Controller
         $data = $this->validated($request);
         $data['slug'] = Post::uniqueSlug($data['title']);
         $data['author_id'] = $request->user()->id;
-        $data['cover_path'] = $request->hasFile('cover') ? $request->file('cover')->store('posts', 'public') : null;
+        // Foto dari HP (sampai 10 MB) diperkecil & disimpan sebagai WebP ringan.
+        $data['cover_path'] = $request->hasFile('cover') ? CoverImage::store($request->file('cover'), 'posts') : null;
         $data = $this->stampPublishedAt($data);
 
         $post = Post::create($data);
@@ -50,8 +52,9 @@ class PostController extends Controller
         }
 
         if ($request->hasFile('cover')) {
+            // Simpan yang baru dulu: bila ditolak, sampul lama tidak ikut hilang.
+            $data['cover_path'] = CoverImage::store($request->file('cover'), 'posts');
             $this->deleteCover($post->cover_path);
-            $data['cover_path'] = $request->file('cover')->store('posts', 'public');
         } elseif ($request->boolean('remove_cover')) {
             $this->deleteCover($post->cover_path);
             $data['cover_path'] = null;
@@ -75,13 +78,14 @@ class PostController extends Controller
     public function uploadImage(Request $request): JsonResponse
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpg,jpeg,png,webp,gif|max:5120',
+            'image' => 'required|image|mimes:jpg,jpeg,png,webp,gif|max:20480',
         ], [
-            'image.max' => 'Ukuran gambar maksimal 5 MB.',
+            'image.max' => 'Ukuran gambar maksimal 20 MB.',
             'image.mimes' => 'Format gambar harus JPG, PNG, WebP, atau GIF.',
         ]);
 
         $file = $request->file('image');
+        \App\Support\ImageGuard::assertSafe($file->getRealPath(), 'image');
         $dir = 'posts/content/' . now()->format('Y/m');
         $path = null;
 
@@ -133,7 +137,11 @@ class PostController extends Controller
             'book_id' => 'nullable|exists:books,id',
             'status' => 'required|in:draft,published',
             'published_at' => 'nullable|date',
-            'cover' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
+            'cover' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:20480',
+        ], [
+            'cover.max' => 'Ukuran foto sampul maksimal 20 MB.',
+            'cover.mimes' => 'Foto sampul harus JPG, PNG, atau WebP.',
+            'body.max' => 'Isi artikel terlalu panjang.',
         ]);
         unset($data['cover']);
 

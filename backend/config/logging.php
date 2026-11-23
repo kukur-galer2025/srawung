@@ -73,6 +73,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Jejak keamanan (login, 2FA, perubahan rekening/QRIS). Terpisah & disimpan 90 hari.
+        'security' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/security.log'),
+            'level' => 'info',
+            'max_files' => 90,
+            'replace_placeholders' => true,
+        ],
+
         'monthly' => [
             'driver' => 'monthly',
             'path' => storage_path('logs/laravel.log'),

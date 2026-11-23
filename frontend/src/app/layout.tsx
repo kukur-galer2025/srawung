@@ -7,6 +7,7 @@ import { CartProvider } from '@/contexts/CartContext';
 import { Analytics } from '@/components/Analytics';
 import { CartSync } from '@/components/CartSync';
 import { FlashHost } from '@/components/FlashHost';
+import { FormValidation } from '@/components/FormValidation';
 import { AssistantWidget } from '@/components/AssistantWidget';
 import { Suspense } from 'react';
 import { preconnect } from 'react-dom';
@@ -61,6 +62,7 @@ export default function RootLayout({
           <CartProvider>
             {children}
             <FlashHost />
+            <FormValidation />
             <AssistantWidget />
             <CartSync />
             <Suspense fallback={null}>

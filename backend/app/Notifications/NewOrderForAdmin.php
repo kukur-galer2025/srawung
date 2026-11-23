@@ -26,7 +26,7 @@ class NewOrderForAdmin extends AmaniaMailNotification
 
         $message = $this->baseMessage("Pesanan baru: {$order->order_number} · {$this->rupiah($order->total)}")
             ->greeting('Ada pesanan baru')
-            ->line("**{$buyer?->name}** ({$buyer?->email}" . ($buyer?->whatsapp ? ", WA {$buyer->whatsapp}" : '') . ") membuat pesanan **{$order->order_number}** berisi {$count} buku.");
+            ->line("**{$this->md($buyer?->name)}** ({$buyer?->email}" . ($buyer?->whatsapp ? ", WA {$buyer->whatsapp}" : '') . ") membuat pesanan **{$order->order_number}** berisi {$count} buku.");
 
         $status = $order->status === 'dikonfirmasi'
             ? 'Pesanan gratis (Rp0) — **langsung aktif**, tidak perlu verifikasi.'

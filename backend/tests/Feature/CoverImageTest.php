@@ -37,19 +37,18 @@ class CoverImageTest extends TestCase
         $this->assertSame(1700, $h); // rasio dipertahankan
     }
 
-    public function test_unreadable_image_is_still_stored_as_is(): void
+    public function test_unreadable_image_is_rejected(): void
     {
         Storage::fake('public');
         Sanctum::actingAs(User::where('role', 'admin')->firstOrFail());
 
-        // Berekstensi .jpg tetapi isinya bukan gambar yang bisa dibaca GD → tetap tersimpan.
+        // Berekstensi .jpg tetapi isinya bukan gambar: file mentah tidak boleh masuk folder publik.
         $fake = UploadedFile::fake()->create('rusak.jpg', 10, 'image/jpeg');
-        $res = $this->post('/api/admin/books', [
+        $this->post('/api/admin/books', [
             'title' => 'Sampul Rusak', 'author' => 'Tes', 'synopsis' => 'x', 'price' => 50000, 'status' => 'draft', 'cover' => $fake,
-        ], ['Accept' => 'application/json'])->assertCreated();
+        ], ['Accept' => 'application/json'])->assertStatus(422)->assertJsonValidationErrors('cover');
 
-        $path = Book::find($res->json('book.id'))->cover_path;
-        $this->assertStringEndsWith('.jpg', $path);
-        Storage::disk('public')->assertExists($path);
+        $this->assertSame([], Storage::disk('public')->allFiles('covers'));
+        $this->assertNull(Book::where('title', 'Sampul Rusak')->first());
     }
 }

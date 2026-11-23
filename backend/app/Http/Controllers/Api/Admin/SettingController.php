@@ -5,11 +5,19 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Services\PaymentInfo;
+use App\Services\Security\SecurityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class SettingController extends Controller
 {
+    /** Pengaturan yang menentukan ke mana uang & peringatan dikirim: perubahannya selalu dilaporkan ke semua admin. */
+    private const SENSITIVE = [
+        'qris_merchant_name' => 'nama merchant QRIS', 'qris_nmid' => 'NMID QRIS', 'bank_name' => 'nama bank', 'bank_account' => 'nomor rekening',
+        'bank_holder' => 'pemilik rekening', 'whatsapp_admin' => 'WhatsApp admin', 'admin_notification_email' => 'email notifikasi admin',
+        'creator_commission_percent' => 'komisi kreator', 'creator_min_payout' => 'minimal penarikan', 'creator_payout_fee' => 'biaya penarikan',
+    ];
+
     public function index()
     {
         $settings = Setting::all()->pluck('value', 'key');
@@ -22,19 +30,22 @@ class SettingController extends Controller
     public function uploadQris(Request $request)
     {
         $request->validate([
-            'qris' => 'required|image|mimes:jpg,jpeg,png,webp|max:3072',
+            'qris' => 'required|image|mimes:jpg,jpeg,png,webp|max:20480',
         ], [
             'qris.required' => 'Pilih gambar QRIS terlebih dahulu.',
-            'qris.max' => 'Ukuran gambar QRIS maksimal 3 MB.',
+            'qris.max' => 'Ukuran gambar QRIS maksimal 20 MB.',
         ]);
 
         $old = PaymentInfo::imagePath();
-        $path = $request->file('qris')->store('payment', 'public');
+        $path = \App\Services\CoverImage::store($request->file('qris'), 'payment', 'qris', 1400, 2400, lossless: true);
         Setting::set('qris_image_path', $path);
 
         if ($old !== $path && $old !== PaymentInfo::DEFAULT_IMAGE && str_starts_with($old, 'payment/')) {
             Storage::disk('public')->delete($old);
         }
+
+        SecurityLog::record('settings.qris_image', $request->user());
+        SecurityLog::notifyAdmins('Gambar QRIS pembayaran diganti', ["Gambar QRIS toko baru saja diganti oleh {$request->user()->email}.", 'Pindai QRIS di halaman pembayaran dan pastikan nama merchant-nya benar.']);
 
         return response()->json(['message' => 'Gambar QRIS diperbarui.', 'qris_url' => PaymentInfo::imageUrl()]);
     }
@@ -63,8 +74,18 @@ class SettingController extends Controller
 
         // Hanya kunci yang dikenal yang boleh disimpan.
         $allowed = ['bank_name', 'bank_account', 'bank_holder', 'whatsapp_admin', 'payment_deadline_hours', 'payment_message_template', 'admin_notification_email', 'qris_merchant_name', 'qris_nmid', 'creator_commission_percent', 'creator_min_payout', 'creator_payout_fee'];
+        $oldAdminEmail = Setting::get('admin_notification_email');
+        $changed = [];
         foreach (array_intersect_key($data['settings'], array_flip($allowed)) as $key => $value) {
-            Setting::set($key, $value === null ? null : (string) $value);
+            $new = $value === null ? null : (string) $value;
+            if (array_key_exists($key, self::SENSITIVE) && (string) Setting::get($key) !== (string) $new) {
+                $changed[] = self::SENSITIVE[$key];
+            }
+            Setting::set($key, $new);
+        }
+        if ($changed) {
+            SecurityLog::record('settings.sensitive', $request->user(), ['changed' => implode(', ', $changed)]);
+            SecurityLog::notifyAdmins('Pengaturan pembayaran/keamanan diubah', ["Diubah oleh {$request->user()->email}: " . implode(', ', $changed) . '.'], [$oldAdminEmail]);
         }
 
         $allSettings = Setting::all()->pluck('value', 'key');

@@ -79,9 +79,10 @@ class BackendApiTest extends TestCase
 
         $sessionToken = $sessionRes->json('session_token');
 
-        // Fetch page 1 (flush headers to ensure sessionToken from query param is used)
+        // Token di alamat ditolak (tercatat di log & riwayat); hanya header Authorization yang berlaku.
         $this->flushHeaders();
-        $pageRes = $this->get('/api/reader/' . $book->slug . '/pages/1?token=' . $sessionToken);
+        $this->get('/api/reader/' . $book->slug . '/pages/1?token=' . $sessionToken)->assertUnauthorized();
+        $pageRes = $this->withToken($sessionToken)->get('/api/reader/' . $book->slug . '/pages/1');
         $pageRes->assertStatus(200);
         $this->assertTrue(in_array($pageRes->headers->get('Content-Type'), ['image/webp', 'image/jpeg']));
         $this->assertGreaterThan(1000, strlen($pageRes->getContent()));
@@ -108,7 +109,7 @@ class BackendApiTest extends TestCase
     public function test_google_auth_routes(): void
     {
         // Test redirect route redirects to accounts.google.com
-        $redirectRes = $this->get('/api/auth/google/redirect');
+        $redirectRes = $this->get('/api/auth/google/redirect?challenge=' . hash('sha256', 'uji'));
         $redirectRes->assertStatus(302);
         $this->assertStringContainsString('accounts.google.com', $redirectRes->headers->get('Location'));
 

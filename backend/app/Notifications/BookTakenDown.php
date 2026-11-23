@@ -18,7 +18,7 @@ class BookTakenDown extends AmaniaMailNotification
     {
         return $this->baseMessage('Buku Anda diturunkan: ' . str($this->book->title)->limit(50))
             ->greeting('Halo, ' . $this->firstName($notifiable))
-            ->line("Buku **{$this->book->title}** kami turunkan dari penjualan (status diubah menjadi Draf) setelah meninjau laporan " . strtolower(BookReport::TYPES[$this->type] ?? $this->type) . '.')
+            ->line("Buku **{$this->md($this->book->title)}** kami turunkan dari penjualan (status diubah menjadi Draf) setelah meninjau laporan " . strtolower(BookReport::TYPES[$this->type] ?? $this->type) . '.')
             ->line("Catatan tim: {$this->note}")
             ->line('Pembeli yang sudah membeli tetap dapat membaca. Bila Anda yakin laporan ini keliru, balas melalui WhatsApp admin dengan bukti kepemilikan atau izin penerbitan, sesuai Syarat & Ketentuan Kreator.')
             ->action('Buka Studio Kreator', $this->frontendUrl('kreator/buku'));

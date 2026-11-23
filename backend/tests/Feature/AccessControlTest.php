@@ -32,7 +32,7 @@ class AccessControlTest extends TestCase
         // Asisten Srawung: hanya membaca katalog publik, tanpa data akun.
         'api/assistant/chat', 'api/assistant/feedback', 'api/assistant/status',
         'api/auth/email/verify/{id}/{hash}', 'api/auth/forgot-password', 'api/auth/google', 'api/auth/google/callback',
-        'api/auth/google/redirect', 'api/auth/login', 'api/auth/register', 'api/auth/reset-password',
+        'api/auth/google/redirect', 'api/auth/google/exchange', 'api/auth/two-factor-challenge', 'api/auth/login', 'api/auth/register', 'api/auth/reset-password',
         'api/banners', 'api/books', 'api/books/{slug}', 'api/books/{slug}/cart-event', 'api/books/{slug}/next', 'api/books/{slug}/report', 'api/books/{slug}/preview/{page}',
         'api/books/{slug}/reviews', 'api/books/{slug}/similar', 'api/books/{slug}/view', 'api/bundles', 'api/bundles/{slug}',
         'api/categories', 'api/client-errors', 'api/creator-terms', 'api/creators/{slug}', 'api/email/reminders/unsubscribe',
@@ -127,7 +127,7 @@ class AccessControlTest extends TestCase
         $this->app['auth']->forgetGuards();
         $res = $this->postJson('/api/auth/register', [
             'name' => 'Penyusup', 'email' => 'penyusup@contoh.test', 'whatsapp' => '081299998888',
-            'password' => 'rahasia123', 'password_confirmation' => 'rahasia123', 'role' => 'admin',
+            'password' => 'Kopi-pagi-27', 'password_confirmation' => 'Kopi-pagi-27', 'role' => 'admin',
         ])->assertCreated();
         $this->assertSame('buyer', User::where('email', 'penyusup@contoh.test')->value('role'));
         $this->assertSame('buyer', $res->json('user.role'));

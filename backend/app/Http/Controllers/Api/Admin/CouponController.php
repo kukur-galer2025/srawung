@@ -19,7 +19,7 @@ class CouponController extends Controller
         $data = $request->validate([
             'code' => 'required|string|max:50|unique:coupons,code',
             'type' => 'required|in:percent,fixed',
-            'value' => 'required|numeric|min:1',
+            'value' => ['required', 'numeric', 'min:1', $request->input('type') === 'percent' ? 'max:100' : 'max:10000000'],
             'quota' => 'nullable|integer|min:1',
             'expires_at' => 'nullable|date',
             'is_public' => 'nullable|boolean',
@@ -50,7 +50,7 @@ class CouponController extends Controller
         $data = $request->validate([
             'code' => 'required|string|max:50|unique:coupons,code,' . $coupon->id,
             'type' => 'required|in:percent,fixed',
-            'value' => 'required|numeric|min:1',
+            'value' => ['required', 'numeric', 'min:1', $request->input('type') === 'percent' ? 'max:100' : 'max:10000000'],
             'quota' => 'nullable|integer|min:1',
             'expires_at' => 'nullable|date',
             'is_public' => 'nullable|boolean',

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { jsonLdHtml } from '@/lib/jsonld';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Clock, Eye } from 'lucide-react';
 import { BookCard } from '@/components/BookCard';
@@ -67,7 +68,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   return (
     <div className="bg-white pb-20">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
 
       <article>
         <header className="mx-auto max-w-3xl px-4 pt-10 sm:px-6 lg:pt-14">

@@ -71,7 +71,8 @@ class UserController extends Controller
 
         $user->forceFill(['is_blocked' => true])->save();
         // Keluarkan semua sesi aktif pengguna yang diblokir.
-        $user->tokens()->delete();
+        \App\Services\Security\LoginSession::revokeAll($user);
+        \App\Services\Security\SecurityLog::record('user.blocked', request()->user(), ['target' => $user->id]);
 
         return response()->json([
             'message' => 'Pengguna berhasil diblokir.',

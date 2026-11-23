@@ -3,42 +3,36 @@
 import { Suspense, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { resolveRedirect } from '@/components/auth/AuthUI';
 import { useAuth } from '@/contexts/AuthContext';
 
 function CallbackContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const { refresh } = useAuth();
+  const { exchangeGoogle } = useAuth();
   const done = useRef(false);
 
   useEffect(() => {
     if (done.current) return;
     done.current = true;
 
-    const token = params.get('token');
+    const code = params.get('code');
     const error = params.get('error');
+    const verifier = sessionStorage.getItem('google_verifier');
+    sessionStorage.removeItem('google_verifier');
 
-    if (error || !token) {
-      router.replace(error ? `/masuk?error=${encodeURIComponent(error)}` : '/masuk');
+    if (error || !code || !verifier) {
+      router.replace(error ? `/masuk?error=${encodeURIComponent(error)}` : '/masuk?error=google_failed');
       return;
     }
 
-    localStorage.setItem('amania_token', token);
-    // Bersihkan token dari URL/riwayat peramban.
+    // Kode sekali pakai (60 detik); tetap dibersihkan dari URL/riwayat peramban.
     window.history.replaceState(null, '', '/auth/callback');
 
-    api
-      .get('/auth/me')
-      .then(async (res) => {
-        await refresh();
-        router.replace(res.user?.role === 'admin' ? '/admin' : '/perpustakaan');
-      })
-      .catch(() => {
-        localStorage.removeItem('amania_token');
-        router.replace('/masuk?error=google_failed');
-      });
-  }, [params, router, refresh]);
+    exchangeGoogle(code, verifier)
+      .then((user) => router.replace(resolveRedirect(null, user.role)))
+      .catch(() => router.replace('/masuk?error=google_failed'));
+  }, [params, router, exchangeGoogle]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 p-4 text-center">

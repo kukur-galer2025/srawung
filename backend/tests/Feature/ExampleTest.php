@@ -14,6 +14,7 @@ class ExampleTest extends TestCase
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        // Backend hanya API: alamat utamanya mengarah ke toko.
+        $response->assertRedirect(config('app.frontend_url'));
     }
 }

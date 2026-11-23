@@ -28,7 +28,7 @@ class BookProcessingFinished extends AmaniaMailNotification
                 : null;
             $message = $this->baseMessage("Buku \u{201C}{$book->title}\u{201D} siap — {$book->total_pages} halaman")
                 ->greeting($greeting)
-                ->line("PDF buku **{$book->title}** selesai diproses menjadi **{$book->total_pages} halaman**" . ($minutes ? " dalam ±{$minutes} menit" : '') . '.')
+                ->line("PDF buku **{$this->md($book->title)}** selesai diproses menjadi **{$book->total_pages} halaman**" . ($minutes ? " dalam ±{$minutes} menit" : '') . '.')
                 ->line('Halaman sudah bertanda air dan siap dibaca pembeli. ' . ($book->status === 'published'
                     ? 'Buku ini berstatus **Terbit** dan sudah tampil di toko.'
                     : 'Buku masih berstatus **Draf** — ubah ke Terbit bila sudah siap dijual.'));
@@ -41,7 +41,7 @@ class BookProcessingFinished extends AmaniaMailNotification
 
         return $this->baseMessage("Konversi buku \u{201C}{$book->title}\u{201D} gagal")
             ->greeting($greeting)
-            ->line("PDF buku **{$book->title}** belum bisa diproses menjadi halaman.")
+            ->line("PDF buku **{$this->md($book->title)}** belum bisa diproses menjadi halaman.")
             ->line('**Alasan:** ' . ($book->processing_error ?: 'tidak diketahui'))
             ->line('Penyebab umum: file PDF rusak, dikunci kata sandi, atau bukan PDF asli. Coba simpan ulang PDF tanpa kata sandi, lalu unggah kembali.')
             ->action('Unggah ulang PDF', $manage)

@@ -56,6 +56,8 @@ class CreateAdmin extends Command
             'is_blocked' => false,
             'email_verified_at' => now(),
         ])->save();
+        // Sandi lama mungkin bocor: keluarkan semua perangkat yang masih masuk dengan akun ini.
+        \App\Services\Security\LoginSession::revokeAll(User::where('email', $email)->first());
         $this->info(($existing ? 'Akun diperbarui menjadi admin: ' : 'Admin dibuat: ') . $email);
 
         if (Category::count() === 0) {

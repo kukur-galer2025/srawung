@@ -26,7 +26,7 @@ class SystemAlert extends AmaniaMailNotification
             ->line('Waktu: ' . now()->timezone('Asia/Jakarta')->translatedFormat('d M Y H:i') . ' WIB');
 
         foreach ($this->problems as $problem) {
-            $mail->line('• ' . $problem);
+            $mail->line('• ' . $this->md($problem));
         }
 
         return $mail

@@ -21,12 +21,12 @@ class BookReportController extends Controller
         $user = $request->user('sanctum');
 
         $data = $request->validate([
-            'reporter_name' => 'required|string|max:120',
-            'reporter_email' => 'required|email|max:190',
+            'reporter_name' => ['required', 'string', new \App\Rules\SafeName],
+            'reporter_email' => 'required|string|email|max:190',
             'type' => ['required', Rule::in(array_keys(BookReport::TYPES))],
             'relationship' => ['required', Rule::in(array_keys(BookReport::RELATIONSHIPS))],
             'description' => 'required|string|min:30|max:5000',
-            'evidence_url' => 'nullable|url|max:500',
+            'evidence_url' => 'nullable|string|url:http,https|max:500',
             'statement' => 'accepted',
         ], [
             'description.min' => 'Jelaskan pelanggarannya minimal 30 karakter (bagian mana, dan bukti kepemilikan bila ada).',
@@ -50,11 +50,14 @@ class BookReportController extends Controller
         ]);
 
         OrderLifecycle::notifyAdmin(new NewBookReport($report));
-        try {
-            Notification::route('mail', $report->reporter_email)->notify(new BookReportReceived($report));
-        } catch (\Throwable $e) {
-            report($e);
-        }
+        // Formulir ini terbuka untuk umum: satu alamat maksimal 2 tanda terima per hari, agar tidak dipakai membanjiri email orang.
+        \Illuminate\Support\Facades\RateLimiter::attempt('report-mail:' . hash('sha256', $report->reporter_email), 2, function () use ($report) {
+            try {
+                Notification::route('mail', $report->reporter_email)->notify(new BookReportReceived($report));
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }, 86400);
 
         return response()->json(['message' => 'Laporan terkirim. Tim kami akan meninjaunya maksimal 3 hari kerja dan mengabari Anda lewat email.'], 201);
     }

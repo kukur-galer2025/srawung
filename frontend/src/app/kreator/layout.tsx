@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BookOpen, ExternalLink, FileText, LayoutDashboard, Loader2, LogOut, Menu, Ticket, TrendingUp, Wallet, X } from 'lucide-react';
+import { BookOpen, ExternalLink, FileText, LayoutDashboard, Loader2, LogOut, Menu, ShieldCheck, Ticket, TrendingUp, Wallet, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar } from '@/components/Navbar';
 import { Logo } from '@/components/Logo';
@@ -15,6 +15,7 @@ const NAV = [
   { name: 'Voucher', href: '/kreator/voucher', icon: Ticket },
   { name: 'Analitik', href: '/kreator/analitik', icon: TrendingUp },
   { name: 'Pendapatan', href: '/kreator/pendapatan', icon: Wallet },
+  { name: 'Keamanan akun', href: '/kreator/keamanan', icon: ShieldCheck },
 ];
 
 /** Studio kreator — tampilan sama bersihnya dengan admin, tetapi hanya berisi data milik kreator. */

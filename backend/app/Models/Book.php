@@ -40,7 +40,10 @@ class Book extends Model
     ];
 
     /** Daftar isi hanya untuk pembaca yang memiliki buku (lihat ReaderController). */
-    protected $hidden = ['toc', 'cover_meta'];
+    protected $hidden = ['toc', 'cover_meta', 'source_file_path', 'processing_error'];
+
+    /** Detail internal file hanya untuk pengelola (admin & kreator pemilik buku). */
+    public const MANAGER_FIELDS = ['source_file_path', 'processing_error'];
 
     protected $appends = [
         'formatted_price',

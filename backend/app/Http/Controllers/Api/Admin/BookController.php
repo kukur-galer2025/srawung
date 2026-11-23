@@ -67,6 +67,8 @@ class BookController extends Controller
         }
 
         $books = $query->paginate(min(max((int) $request->query("per_page", 15), 1), 100));
+        $books->getCollection()->each->makeVisible(Book::MANAGER_FIELDS);
+
         return response()->json($books);
     }
 
@@ -99,14 +101,14 @@ class BookController extends Controller
 
         return response()->json([
             'message' => 'Buku berhasil ditambahkan.',
-            'book' => $book->load('category'),
+            'book' => $book->load('category')->makeVisible(Book::MANAGER_FIELDS),
         ], 201);
     }
 
     public function show($id)
     {
         $book = $this->books()->with(['category', 'pages:id,book_id,page_number,image_path'])->findOrFail($id);
-        return response()->json($book);
+        return response()->json($book->makeVisible(Book::MANAGER_FIELDS));
     }
 
     public function update(Request $request, $id)
@@ -138,17 +140,18 @@ class BookController extends Controller
         }
 
         if ($request->hasFile('cover')) {
+            // Simpan yang baru dulu: bila ditolak, sampul lama tidak ikut hilang.
+            $data['cover_path'] = CoverImage::store($request->file('cover'));
             if ($book->cover_path && Storage::disk('public')->exists($book->cover_path)) {
                 Storage::disk('public')->delete($book->cover_path);
             }
-            $data['cover_path'] = CoverImage::store($request->file('cover'));
         }
 
         $book->update($data);
 
         return response()->json([
             'message' => 'Buku berhasil diperbarui.',
-            'book' => $book->load('category'),
+            'book' => $book->load('category')->makeVisible(Book::MANAGER_FIELDS),
         ]);
     }
 
@@ -192,7 +195,7 @@ class BookController extends Controller
 
         return response()->json([
             'message' => 'File buku berhasil diunggah dan sedang diproses.',
-            'book' => $book->fresh('category'),
+            'book' => $book->fresh('category')->makeVisible(Book::MANAGER_FIELDS),
         ]);
     }
 
@@ -212,7 +215,7 @@ class BookController extends Controller
 
         return response()->json([
             'message' => 'Konversi PDF dijadwalkan ulang.',
-            'book' => $book->fresh('category'),
+            'book' => $book->fresh('category')->makeVisible(Book::MANAGER_FIELDS),
         ]);
     }
 }

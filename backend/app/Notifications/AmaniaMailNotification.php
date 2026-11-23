@@ -72,6 +72,17 @@ abstract class AmaniaMailNotification extends Notification implements ShouldQueu
     {
         $name = trim((string) ($notifiable->name ?? ''));
 
-        return $name === '' ? 'Pembaca' : explode(' ', $name)[0];
+        return $name === '' ? 'Pembaca' : $this->md(explode(' ', $name)[0]);
+    }
+
+    /**
+     * Teks dari pengguna (nama, catatan, judul) untuk dipakai di isi email. Simbol Markdown
+     * dinetralkan agar orang tidak bisa menyisipkan tautan/gambar penipuan ke email resmi.
+     */
+    protected function md(string|\Stringable|null $text): string
+    {
+        $text = preg_replace('/[\x00-\x1F\x7F]+/', ' ', (string) $text);
+
+        return preg_replace('/([\\\\`*\[\]])/', '\\\\$1', $text);
     }
 }

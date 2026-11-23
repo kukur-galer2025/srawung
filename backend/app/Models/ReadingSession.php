@@ -23,6 +23,14 @@ class ReadingSession extends Model
         'ended_reason',
     ];
 
+    protected $hidden = ['session_token'];
+
+    /** Token hanya disimpan sebagai hash: kebocoran database tidak memberi akses baca. */
+    public static function hashToken(string $token): string
+    {
+        return hash('sha256', $token);
+    }
+
     protected function casts(): array
     {
         return [

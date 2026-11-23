@@ -28,7 +28,7 @@ class NewPaymentProofForAdmin extends AmaniaMailNotification
             ($isReupload ? 'Bukti bayar diunggah ulang' : 'Bukti bayar baru') . ": {$order->order_number} · {$this->rupiah($order->total)}"
         )
             ->greeting($isReupload ? 'Bukti pembayaran diunggah ulang' : 'Ada bukti pembayaran baru')
-            ->line("**{$buyer?->name}** ({$buyer?->email}" . ($buyer?->whatsapp ? ", WA {$buyer->whatsapp}" : '') . ") mengunggah bukti pembayaran untuk pesanan **{$order->order_number}**.")
+            ->line("**{$this->md($buyer?->name)}** ({$buyer?->email}" . ($buyer?->whatsapp ? ", WA {$buyer->whatsapp}" : '') . ") mengunggah bukti pembayaran untuk pesanan **{$order->order_number}**.")
             ->line("Cocokkan mutasi QRIS dengan nominal **{$this->rupiah($order->total)}** dan bukti yang diunggah.")
             ->line($this->orderTable($order));
 
@@ -37,14 +37,14 @@ class NewPaymentProofForAdmin extends AmaniaMailNotification
         if ($check['flags']) {
             $lines = array_map(fn ($f) => '- ' . (\App\Services\ProofInspector::FLAG_LABELS[$f] ?? $f), $check['flags']);
             if ($m = $check['match']) {
-                $lines[] = "- Mirip {$m['similarity']}% dengan bukti pesanan **{$m['order_number']}** ({$m['buyer_name']}, status: {$m['order_status']})";
+                $lines[] = "- Mirip {$m['similarity']}% dengan bukti pesanan **{$m['order_number']}** ({$this->md($m['buyer_name'])}, status: {$m['order_status']})";
             }
             $message->line("**⚠️ Perlu dicek lebih teliti:**\n" . implode("\n", $lines));
         }
 
         if ($this->proof->buyer_note) {
             $note = trim(preg_replace('/\s+/', ' ', $this->proof->buyer_note));
-            $message->line("> **Catatan pembeli:** {$note}");
+            $message->line("> **Catatan pembeli:** {$this->md($note)}");
         }
 
         return $message

@@ -126,6 +126,9 @@ class ProofInspector
         if (!function_exists('imagecreatefromstring')) {
             return null;
         }
+        if (!\App\Support\ImageGuard::isSafe($path)) {
+            return null; // bukan gambar, atau terlalu besar untuk dibuka dengan aman
+        }
         $data = @file_get_contents($path);
         $img = $data !== false ? @imagecreatefromstring($data) : false;
         if (!$img) {

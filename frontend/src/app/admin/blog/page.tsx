@@ -5,7 +5,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { ExternalLink, ImagePlus, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { confirmDialog } from '@/lib/dialog';
+import { confirmDialog, toast } from '@/lib/dialog';
 import { formatDateTime } from '@/lib/utils';
 import { AdminHeader, Button, Field, Input, Notice, Panel, SearchInput, Select, Table, Tabs, Textarea, td, th } from '@/components/admin/ui';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
@@ -368,7 +368,10 @@ function CoverPicker({
 
   const shown = preview ?? currentUrl;
   const accept = (f: File | undefined) => {
-    if (f && /^image\/(png|jpe?g|webp)$/.test(f.type)) onPick(f);
+    if (!f) return;
+    if (!/^image\/(png|jpe?g|webp)$/.test(f.type)) return toast.error('Foto sampul harus JPG, PNG, atau WebP.');
+    if (f.size > 20 * 1024 * 1024) return toast.error('Ukuran foto sampul maksimal 20 MB.');
+    onPick(f);
   };
 
   return (
@@ -412,7 +415,7 @@ function CoverPicker({
           <span className="text-center text-sm text-slate-500">
             <ImagePlus className="mx-auto mb-2 h-7 w-7 text-slate-400" />
             <strong className="block text-slate-700">Klik atau tarik foto ke sini</strong>
-            JPG, PNG, atau WebP · maks. 3 MB · rasio 2:1 (mis. 1600×800)
+            JPG, PNG, atau WebP · maks. 20 MB · rasio 2:1 (mis. 1600×800)
           </span>
         )}
         <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => accept(e.target.files?.[0])} />
