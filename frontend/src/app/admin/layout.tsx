@@ -86,6 +86,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { user, loading, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  // Pengingat 2FA bisa ditutup untuk sesi ini (muncul lagi di tab/sesi baru sampai 2FA aktif).
+  const [hide2fa, setHide2fa] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && sessionStorage.getItem('hide-2fa-banner') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [lastPath, setLastPath] = useState(pathname);
   if (pathname !== lastPath) {
     setLastPath(pathname);
@@ -213,13 +221,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {!user.two_factor_enabled && pathname !== '/admin/keamanan' && (
-            <Link href="/admin/keamanan" className="mb-5 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 transition hover:bg-amber-100">
-              <ShieldAlert className="h-5 w-5 shrink-0" />
-              <span>
-                <strong>Akun admin ini belum memakai verifikasi dua langkah.</strong> Aktifkan sekarang, cukup 1 menit.
-              </span>
-            </Link>
+          {!user.two_factor_enabled && pathname !== '/admin/keamanan' && !hide2fa && (
+            <div className="mb-5 flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 py-1.5 pl-3 pr-1.5 text-[13px] text-amber-900">
+              <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600" />
+              <span className="min-w-0 flex-1 truncate">Verifikasi dua langkah belum aktif</span>
+              <Link href="/admin/keamanan" className="shrink-0 rounded-md px-2 py-1 font-semibold hover:bg-amber-100">
+                Aktifkan
+              </Link>
+              <button
+                onClick={() => {
+                  setHide2fa(true);
+                  try {
+                    sessionStorage.setItem('hide-2fa-banner', '1');
+                  } catch {
+                    /* abaikan */
+                  }
+                }}
+                aria-label="Tutup pengingat"
+                className="shrink-0 rounded-md p-1 text-amber-700/70 hover:bg-amber-100 hover:text-amber-900"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )}
           {children}
         </main>

@@ -9,7 +9,7 @@ import { promptDialog } from '@/lib/dialog';
 import { PAYOUT_STATUS, type CreatorBalance, type PayoutRow } from '@/lib/creator';
 import type { Paginated } from '@/lib/types';
 import { formatDateTime, formatRupiah } from '@/lib/utils';
-import { AdminHeader, Button, Field, Input, Notice, Panel, Table, Tabs, td, th } from '@/components/admin/ui';
+import { AdminHeader, Button, Field, FilePicker, Input, Notice, Panel, Table, Tabs, td, th } from '@/components/admin/ui';
 import { Badge } from '@/components/Badge';
 import { Modal } from '@/components/Modal';
 import { Pagination } from '@/components/Pagination';
@@ -223,7 +223,7 @@ function PaidModal({ payout, onClose, onDone }: { payout: PayoutRow; onClose: ()
           <Input value={reference} onChange={(e) => setReference(e.target.value)} maxLength={120} placeholder="mis. 2611181234" />
         </Field>
         <Field label="Bukti transfer (opsional)" hint="JPG, PNG, atau PDF · maks. 20 MB">
-          <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={(e) => setProof(e.target.files?.[0] ?? null)} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium" />
+          <FilePicker accept="image/jpeg,image/png,application/pdf" file={proof} onPick={setProof} placeholder="Pilih foto atau PDF bukti transfer" />
         </Field>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
           <Button type="button" variant="secondary" onClick={onClose}>

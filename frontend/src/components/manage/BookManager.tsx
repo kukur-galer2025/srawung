@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, FileUp, Loader2, Pencil, Plus, RefreshCw, 
 import { api, uploadWithProgress } from '@/lib/api';
 import { confirmDialog } from '@/lib/dialog';
 import { formatRupiah } from '@/lib/utils';
-import { AdminHeader, Button, Field, Input, Notice, Panel, SearchInput, Select, Table, Tabs, Textarea, td, th } from '@/components/admin/ui';
+import { AdminHeader, Button, Field, FilePicker, Input, Notice, Panel, SearchInput, Select, Table, Tabs, Textarea, td, th } from '@/components/admin/ui';
 import { Badge } from '@/components/Badge';
 import { BookCover, resolveCover } from '@/components/BookCard';
 import { Modal } from '@/components/Modal';
@@ -500,8 +500,8 @@ export function BookManager({ mode = 'admin' }: { mode?: 'admin' | 'creator' }) 
                 ))}
             </Select>
           </Field>
-          <fieldset className="rounded-xl border border-rose-200 bg-rose-50/40 p-4">
-            <legend className="px-1 text-sm font-semibold text-rose-700">Harga promo (opsional)</legend>
+          <fieldset className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <legend className="px-1 text-[13px] font-medium text-slate-700">Harga promo (opsional)</legend>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Harga promo (Rp)"
@@ -527,7 +527,7 @@ export function BookManager({ mode = 'admin' }: { mode?: 'admin' | 'creator' }) 
                   : `${editing ? 'Kosongkan jika tidak diganti. ' : ''}JPG/PNG/WebP, ukuran bebas — otomatis dikompres agar cepat tampil`
               }
             >
-              <Input type="file" accept="image/*" onChange={(e) => setCover(e.target.files?.[0] ?? null)} className="pt-2 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
+              <FilePicker accept="image/*" file={cover} onPick={setCover} placeholder="Pilih gambar sampul" />
             </Field>
             <Field
               label="File buku (PDF)"
@@ -539,7 +539,7 @@ export function BookManager({ mode = 'admin' }: { mode?: 'admin' | 'creator' }) 
                     : 'Ukuran bebas, diproses menjadi halaman'
               }
             >
-              <Input type="file" accept="application/pdf" onChange={(e) => setPdf(e.target.files?.[0] ?? null)} className="pt-2 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
+              <FilePicker accept="application/pdf" file={pdf} onPick={setPdf} placeholder="Pilih file PDF" />
             </Field>
           </div>
           {progress && (

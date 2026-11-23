@@ -1,7 +1,7 @@
 'use client';
 
-import React, { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { Inbox, Loader2, Search, X } from 'lucide-react';
+import React, { forwardRef, useEffect, useRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { Inbox, Loader2, Search, Upload, X } from 'lucide-react';
 
 /*
  * Kit UI admin — gaya minimalis: latar putih, garis tipis, tanpa bayangan berat,
@@ -10,10 +10,10 @@ import { Inbox, Loader2, Search, X } from 'lucide-react';
 
 export function AdminHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-900">{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">{description}</p>}
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-[22px]">{title}</h1>
+        {description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500 sm:text-sm">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>}
     </div>
@@ -93,6 +93,21 @@ export function Textarea({ className = '', ...p }: TextareaHTMLAttributes<HTMLTe
   return <textarea {...p} className={`py-2.5 ${fieldBase} ${className}`} />;
 }
 
+/**
+ * Pemilih file bergaya Srawung (pengganti tombol "Choose File / No file chosen" bawaan peramban).
+ * Dipakai di dalam <Field>: label Field membuka pemilih file saat diklik.
+ */
+export function FilePicker({ accept, file, onPick, placeholder = 'Pilih file' }: { accept: string; file: File | null; onPick: (f: File | null) => void; placeholder?: string }) {
+  return (
+    <span className="flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-slate-300 bg-white pl-3 pr-1.5 text-sm transition hover:border-slate-400 hover:bg-slate-50">
+      <Upload className="h-4 w-4 shrink-0 text-slate-400" />
+      <span className={`min-w-0 flex-1 truncate ${file ? 'font-medium text-slate-900' : 'text-slate-500'}`}>{file ? file.name : placeholder}</span>
+      <span className="shrink-0 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{file ? 'Ganti' : 'Pilih'}</span>
+      <input type="file" accept={accept} className="sr-only" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
+    </span>
+  );
+}
+
 export function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <div className="relative w-full sm:w-64">
@@ -110,7 +125,7 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
 /** Tab bergaris bawah — jelas mana yang aktif tanpa kotak berlapis. */
 export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { id: T; label: string; count?: number }[] }) {
   return (
-    <div className="no-scrollbar -mb-px flex gap-5 overflow-x-auto border-b border-slate-200" role="tablist">
+    <div className="tabs-fade no-scrollbar -mb-px flex gap-5 overflow-x-auto border-b border-slate-200" role="tablist">
       {items.map((t) => {
         const active = value === t.id;
         return (
@@ -149,9 +164,11 @@ export function Table({
   colSpan: number;
   emptyText?: string;
 }) {
+  const ref = useRef<HTMLTableElement>(null);
+  useResponsiveTable(ref);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
+      <table ref={ref} className="rtable w-full text-left text-sm">
         <thead className="border-b border-slate-100 text-xs font-medium text-slate-500">{head}</thead>
         <tbody className="divide-y divide-slate-100 [&>tr]:transition-colors [&>tr:hover]:bg-slate-50/70">
           {loading ? (
@@ -174,6 +191,43 @@ export function Table({
       </table>
     </div>
   );
+}
+
+/**
+ * Di HP (< 640 px) tabel tampil sebagai kartu: tiap sel diberi label dari kepala kolomnya
+ * (data-label), sel tanpa judul kolom dianggap tombol aksi (data-actions) dan ditaruh di
+ * bawah kartu, sehingga tombol seperti "Periksa" tidak pernah terdorong keluar layar.
+ * Gaya kartunya di globals.css (blok "Tabel responsif").
+ */
+export function useResponsiveTable(ref: React.RefObject<HTMLTableElement | null>) {
+  useEffect(() => {
+    const table = ref.current;
+    if (!table) return;
+    const label = () => {
+      const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent?.trim() ?? '');
+      table.querySelectorAll(':scope > tbody > tr').forEach((tr) => {
+        [...tr.children].forEach((cell, i) => {
+          const td = cell as HTMLTableCellElement;
+          if (td.colSpan > 1) {
+            td.setAttribute('data-full', '');
+            return;
+          }
+          const h = heads[i] ?? '';
+          if (h) {
+            td.setAttribute('data-label', h);
+            td.removeAttribute('data-actions');
+          } else {
+            td.removeAttribute('data-label');
+            td.setAttribute('data-actions', '');
+          }
+        });
+      });
+    };
+    label();
+    const mo = new MutationObserver(label);
+    mo.observe(table, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [ref]);
 }
 
 export const th = 'px-4 py-3 font-medium';
@@ -200,9 +254,9 @@ export function Notice({ tone, children, onClose }: { tone: 'success' | 'error';
 /** Angka ringkas di atas halaman (dashboard, laporan, newsletter). */
 export function Stat({ label, value, hint, tone = 'default' }: { label: string; value: ReactNode; hint?: ReactNode; tone?: 'default' | 'attention' }) {
   return (
-    <div className={`rounded-xl border bg-white p-4 ${tone === 'attention' ? 'border-amber-300 ring-4 ring-amber-50' : 'border-slate-200/80'}`}>
+    <div className={`min-w-0 rounded-xl border bg-white p-4 ${tone === 'attention' ? 'border-amber-300 ring-4 ring-amber-50' : 'border-slate-200/80'}`}>
       <p className="text-[13px] text-slate-500">{label}</p>
-      <p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">{value}</p>
+      <p className="mt-1.5 text-lg font-semibold tabular-nums tracking-tight text-slate-900 sm:text-2xl">{value}</p>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );

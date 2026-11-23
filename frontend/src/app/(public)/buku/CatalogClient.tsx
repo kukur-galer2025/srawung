@@ -187,7 +187,7 @@ export function CatalogClient() {
               )}
             </nav>
 
-            <p className="rise eyebrow text-jade-300/90">{activeCategory ? 'Koleksi kategori' : search ? 'Hasil pencarian' : onSale ? 'Penawaran terbatas' : 'Katalog Amania Press'}</p>
+            <p className="rise eyebrow text-jade-300/90">{activeCategory ? 'Koleksi kategori' : search ? 'Hasil pencarian' : onSale ? 'Penawaran terbatas' : 'Katalog Srawung'}</p>
             <h1 className="rise delay-1 mt-4 font-display text-[2.6rem] font-medium leading-[1.02] tracking-tight text-balance sm:text-6xl lg:text-[4.2rem]">
               {activeCategory ? (
                 <>

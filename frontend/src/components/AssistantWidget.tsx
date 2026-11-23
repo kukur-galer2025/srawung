@@ -469,7 +469,7 @@ export function AssistantWidget() {
       {/* Tombol pembuka + gelembung sapaan */}
       {!open && (
         <div
-          className={`fixed right-4 z-[70] flex flex-col items-end gap-2 sm:right-6 ${
+          className={`kanca-launcher fixed right-4 z-[70] flex flex-col items-end gap-2 sm:right-6 ${
             isMember
               ? 'bottom-[calc(6.25rem+env(safe-area-inset-bottom))] md:bottom-6'
               : hasBuyBar

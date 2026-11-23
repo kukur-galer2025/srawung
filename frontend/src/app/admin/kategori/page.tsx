@@ -2,10 +2,12 @@
 
 import React, { useState } from 'react';
 import useSWR from 'swr';
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import Link from 'next/link';
+import { Pencil, Plus, Tags, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { confirmDialog } from '@/lib/dialog';
-import { AdminHeader, Button, Input, Notice, Panel, Table, td, th } from '@/components/admin/ui';
+import { confirmDialog, toast } from '@/lib/dialog';
+import { AdminHeader, Button, Field, Input, Notice, Panel, Table, td, th } from '@/components/admin/ui';
+import { Modal } from '@/components/Modal';
 
 interface Category {
   id: number;
@@ -14,142 +16,175 @@ interface Category {
   books_count: number;
 }
 
+const toSlug = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/&/g, ' ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 export default function AdminCategoriesPage() {
-  const { data, isLoading, mutate } = useSWR<Category[]>('/admin/categories', (url: string) => api.get(url));
-  const [name, setName] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editName, setEditName] = useState('');
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const { data, isLoading, error, mutate } = useSWR<Category[]>('/admin/categories', (url: string) => api.get(url));
+  const rows = Array.isArray(data) ? data : [];
 
-  const run = async (fn: () => Promise<unknown>, ok: string) => {
-    setNotice(null);
-    try {
-      await fn();
-      setNotice({ tone: 'success', text: ok });
-      await mutate();
-      return true;
-    } catch (err: unknown) {
-      setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'Terjadi kesalahan.' });
-      return false;
-    }
+  // null = tertutup; { id: null } = tambah; { id } = ubah
+  const [form, setForm] = useState<{ id: number | null; name: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const openAdd = () => {
+    setFormError(null);
+    setForm({ id: null, name: '' });
+  };
+  const openEdit = (c: Category) => {
+    setFormError(null);
+    setForm({ id: c.id, name: c.name });
   };
 
-  const add = async (e: React.FormEvent) => {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    setAdding(true);
-    if (await run(() => api.post('/admin/categories', { name: name.trim() }), `Kategori "${name.trim()}" ditambahkan.`)) setName('');
-    setAdding(false);
-  };
-
-  const save = async (c: Category) => {
-    if (!editName.trim() || editName.trim() === c.name) return setEditId(null);
-    if (await run(() => api.put(`/admin/categories/${c.id}`, { name: editName.trim() }), 'Kategori diperbarui.')) setEditId(null);
+    if (!form) return;
+    const name = form.name.trim();
+    setSaving(true);
+    setFormError(null);
+    try {
+      if (form.id) {
+        await api.put(`/admin/categories/${form.id}`, { name });
+        toast.success('Kategori diperbarui', `Nama kategori menjadi "${name}".`);
+      } else {
+        await api.post('/admin/categories', { name });
+        toast.success('Kategori ditambahkan', `"${name}" sudah bisa dipilih saat menambah buku.`);
+      }
+      setForm(null);
+      await mutate();
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Kategori gagal disimpan.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const remove = async (c: Category) => {
     const ok = await confirmDialog({
       title: `Hapus kategori "${c.name}"?`,
-      text: c.books_count > 0 ? `${c.books_count} buku di kategori ini akan menjadi tanpa kategori.` : 'Kategori ini belum dipakai buku apa pun.',
+      text:
+        c.books_count > 0
+          ? `${c.books_count} buku di kategori ini tidak dihapus, tetapi menjadi tanpa kategori. Anda bisa memindahkannya ke kategori lain lewat menu Buku.`
+          : 'Kategori ini belum dipakai buku apa pun.',
       confirmText: 'Hapus kategori',
       tone: 'danger',
     });
     if (!ok) return;
-    run(() => api.delete(`/admin/categories/${c.id}`), `Kategori "${c.name}" dihapus.`);
+    try {
+      await api.delete(`/admin/categories/${c.id}`);
+      toast.success('Kategori dihapus', `"${c.name}" sudah dihapus.`);
+      await mutate();
+    } catch (err: unknown) {
+      toast.error('Kategori gagal dihapus', err instanceof Error ? err.message : undefined);
+    }
   };
 
-  const rows = Array.isArray(data) ? data : [];
+  const editing = form?.id ? rows.find((c) => c.id === form.id) : null;
 
   return (
     <>
-      <AdminHeader title="Kategori" description="Kelompokkan buku agar mudah ditemukan pembeli." />
-
-      {notice && (
-        <Notice tone={notice.tone} onClose={() => setNotice(null)}>
-          {notice.text}
-        </Notice>
-      )}
-
-      <Panel className="mb-6 p-4">
-        <form onSubmit={add} className="flex flex-col gap-3 sm:flex-row">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama kategori baru, mis. Sejarah" maxLength={255} />
-          <Button type="submit" loading={adding} disabled={!name.trim()} className="shrink-0">
+      <AdminHeader
+        title="Kategori"
+        description="Kelompokkan buku agar mudah ditemukan pembeli. Kategori tampil di katalog dan dipilih saat menambah buku."
+        actions={
+          <Button onClick={openAdd}>
             <Plus className="h-4 w-4" />
-            Tambah
+            Tambah kategori
           </Button>
-        </form>
-      </Panel>
+        }
+      />
+
+      {error && <Notice tone="error">Daftar kategori gagal dimuat: {error instanceof Error ? error.message : 'coba muat ulang halaman.'}</Notice>}
 
       <Panel className="overflow-hidden">
-        <Table
-          colSpan={4}
-          loading={isLoading}
-          empty={!rows.length}
-          head={
-            <tr>
-              <th className={th}>Nama</th>
-              <th className={th}>Slug</th>
-              <th className={th}>Jumlah buku</th>
-              <th className={th}></th>
-            </tr>
-          }
-        >
-          {rows.map((c) => (
-            <tr key={c.id} className="hover:bg-slate-50/60">
-              <td className={td}>
-                {editId === c.id ? (
-                  <Input
-                    autoFocus
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') save(c);
-                      if (e.key === 'Escape') setEditId(null);
-                    }}
-                    className="h-9"
-                  />
-                ) : (
-                  <span className="font-semibold text-slate-900">{c.name}</span>
-                )}
-              </td>
-              <td className={`${td} font-mono text-xs text-slate-500`}>{c.slug}</td>
-              <td className={`${td} tabular-nums text-slate-600`}>{c.books_count}</td>
-              <td className={`${td} text-right`}>
-                <div className="flex justify-end gap-1">
-                  {editId === c.id ? (
-                    <>
-                      <Button size="sm" variant="ghost" onClick={() => save(c)} aria-label="Simpan">
-                        <Check className="h-4 w-4 text-emerald-600" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEditId(null)} aria-label="Batal">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditId(c.id);
-                          setEditName(c.name);
-                        }}
-                        aria-label={`Ubah ${c.name}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => remove(c)} aria-label={`Hapus ${c.name}`} className="hover:bg-rose-50 hover:text-rose-600">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </Table>
+        {!isLoading && !rows.length ? (
+          <div className="px-6 py-14 text-center">
+            <Tags className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-3 font-medium text-slate-900">Belum ada kategori</p>
+            <p className="mt-1 text-sm text-slate-500">Contoh: Pemrograman, Desain, Persiapan Ujian.</p>
+            <Button className="mt-5" onClick={openAdd}>
+              <Plus className="h-4 w-4" />
+              Tambah kategori pertama
+            </Button>
+          </div>
+        ) : (
+          <Table
+            colSpan={4}
+            loading={isLoading}
+            empty={!rows.length}
+            head={
+              <tr>
+                <th className={th}>Nama</th>
+                <th className={th}>Alamat di katalog</th>
+                <th className={th}>Jumlah buku</th>
+                <th className={th}></th>
+              </tr>
+            }
+          >
+            {rows.map((c) => (
+              <tr key={c.id}>
+                <td className={`${td} font-medium text-slate-900`}>{c.name}</td>
+                <td className={`${td} text-[13px] text-slate-500`}>
+                  <Link href={`/buku?kategori=${c.slug}`} target="_blank" className="hover:text-slate-900 hover:underline">
+                    /buku?kategori={c.slug}
+                  </Link>
+                </td>
+                <td className={`${td} tabular-nums text-slate-600`}>{c.books_count} buku</td>
+                <td className={td}>
+                  <div className="flex justify-end gap-1.5">
+                    <Button size="sm" variant="secondary" onClick={() => openEdit(c)} aria-label={`Ubah ${c.name}`}>
+                      <Pencil className="h-3.5 w-3.5" />
+                      Ubah
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => remove(c)} aria-label={`Hapus ${c.name}`} className="hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600">
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Hapus
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </Table>
+        )}
       </Panel>
+
+      <Modal isOpen={!!form} onClose={() => setForm(null)} title={form?.id ? 'Ubah kategori' : 'Tambah kategori'} maxWidth="md">
+        {form && (
+          <form onSubmit={save} className="space-y-5">
+            {formError && (
+              <p role="alert" className="rounded-lg bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700">
+                {formError}
+              </p>
+            )}
+            <Field
+              label="Nama kategori"
+              hint={form.name.trim() ? `Alamat di katalog: /buku?kategori=${toSlug(form.name.trim()) || '…'}` : 'Mis. Sejarah, Bisnis & Keuangan, Novel'}
+            >
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={255} autoFocus placeholder="Nama kategori" />
+            </Field>
+            {editing && editing.books_count > 0 && (
+              <p className="rounded-lg bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-600">
+                {editing.books_count} buku di kategori ini ikut memakai nama baru.
+              </p>
+            )}
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+              <Button type="button" variant="secondary" onClick={() => setForm(null)}>
+                Batal
+              </Button>
+              <Button type="submit" loading={saving}>
+                {form.id ? 'Simpan' : 'Tambah kategori'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </>
   );
 }

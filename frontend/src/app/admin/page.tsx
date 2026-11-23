@@ -33,12 +33,12 @@ const compactRupiah = (n: number) =>
 
 function StatTile({ icon: Icon, label, value, hint, href, highlight }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; hint?: string; href?: string; highlight?: boolean }) {
   const body = (
-    <Panel className={`h-full p-5 transition ${href ? 'hover:border-slate-300 hover:shadow-md' : ''} ${highlight ? 'ring-2 ring-amber-300' : ''}`}>
+    <Panel className={`h-full p-4 transition sm:p-5 ${href ? 'hover:border-slate-300 hover:shadow-md' : ''} ${highlight ? 'ring-2 ring-amber-300' : ''}`}>
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-slate-500">{label}</p>
+        <p className="text-[13px] font-medium leading-snug text-slate-500 sm:text-sm">{label}</p>
         <Icon className="h-[18px] w-[18px] text-slate-400" />
       </div>
-      <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
+      <p className="mt-2 whitespace-nowrap text-lg font-bold tracking-tight text-slate-900 tabular-nums sm:mt-3 sm:text-2xl">{value}</p>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </Panel>
   );
@@ -157,7 +157,7 @@ export default function AdminDashboardPage() {
 
       {error && <Panel className="mb-6 p-4 text-sm text-rose-700">Gagal memuat data dashboard.</Panel>}
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="dash-stats mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         {isLoading || !data ? (
           Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
         ) : (
