@@ -68,7 +68,7 @@ class DatabaseSeeder extends Seeder
             'bank_name' => 'BCA',
             'bank_account' => '1234567890',
             'bank_holder' => 'Amania Digital Books',
-            'whatsapp_admin' => '6285724026505',
+            'whatsapp_admin' => '6285181836438',
             'payment_message_template' => 'Halo {nama}, pesanan #{nomor} senilai Rp {total} telah {status}. Terima kasih!',
             'payment_deadline_hours' => '24',
         ];

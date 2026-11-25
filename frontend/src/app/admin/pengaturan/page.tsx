@@ -217,7 +217,7 @@ function SettingsForm({ initial, qrisUrl, onSaved }: { initial: Settings; qrisUr
             <Input required type="number" min={1} max={168} value={form.payment_deadline_hours} onChange={set('payment_deadline_hours')} />
           </Field>
           <Field label="WhatsApp admin" hint="Format 628xxxxxxxxxx">
-            <Input required inputMode="tel" value={form.whatsapp_admin} onChange={set('whatsapp_admin')} placeholder="6285724026505" />
+            <Input required inputMode="tel" value={form.whatsapp_admin} onChange={set('whatsapp_admin')} placeholder="6285181836438" />
           </Field>
           <Field label="Email notifikasi admin" hint="Menerima email setiap ada bukti pembayaran baru. Kosongkan = kotak masuk toko (pengirim email).">
             <Input type="email" value={form.admin_notification_email} onChange={set('admin_notification_email')} placeholder="kasir@tokoanda.com" />

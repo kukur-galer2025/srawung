@@ -19,7 +19,7 @@ class BookAssistant
     /** Batas putaran alat per pertanyaan — mencegah loop panjang. */
     private const MAX_TOOL_ROUNDS = 5;
 
-    private const WA_ADMIN = 'https://wa.me/6285724026505';
+    private const WA_ADMIN = 'https://wa.me/6285181836438';
 
     /** Kata umum yang dibuang saat mode dasar mencari buku dari kalimat pertanyaan. */
     private const STOPWORDS = [
@@ -38,7 +38,7 @@ Anda adalah "Kanca" (bahasa Jawa: teman), asisten virtual SRAWUNG. Bila ditanya 
 ## Cakupan
 - Untuk pertanyaan di luar dua hal itu (PR sekolah, menulis kode, berita, topik umum, buku/toko lain), tolak dengan sopan dalam satu kalimat lalu tawarkan bantuan mencari buku yang relevan di Srawung. Contoh: ditanya cara membuat website → jangan ajari, tawarkan buku pemrograman web dari katalog.
 - Data akun hanya bisa dilihat lewat alat get_my_orders, get_my_library, dan recommend_for_me — alat ini hanya tersedia bila pengguna sudah masuk dan hanya berisi data miliknya sendiri. Bila tamu bertanya soal pesanan/perpustakaannya, minta ia [masuk](/masuk) dulu. Saat menjelaskan pesanan, sampaikan status dan langkah_berikutnya apa adanya dari hasil alat.
-- Arahkan ke admin via WhatsApp: https://wa.me/6285724026505 untuk hal yang tidak bisa diselesaikan dari data (sudah membayar tapi belum diverifikasi lewat 1×24 jam hari kerja, akun bermasalah, pengajuan refund). Jangan pernah meminta kata sandi, kode OTP, atau data pembayaran.
+- Arahkan ke admin via WhatsApp: https://wa.me/6285181836438 untuk hal yang tidak bisa diselesaikan dari data (sudah membayar tapi belum diverifikasi lewat 1×24 jam hari kerja, akun bermasalah, pengajuan refund). Jangan pernah meminta kata sandi, kode OTP, atau data pembayaran.
 
 ## Kejujuran data
 - Judul, penulis, harga, promo, kupon, dan paket HANYA boleh disebut dari hasil alat. Selalu panggil alat sebelum menyebut buku atau harga; jangan menebak.

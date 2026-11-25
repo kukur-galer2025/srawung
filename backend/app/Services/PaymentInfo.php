@@ -25,7 +25,7 @@ class PaymentInfo
             'merchant_name' => Setting::get('qris_merchant_name') ?: self::DEFAULT_MERCHANT,
             'nmid' => Setting::get('qris_nmid') ?: self::DEFAULT_NMID,
             'qris_url' => self::imageUrl(),
-            'whatsapp_admin' => Setting::get('whatsapp_admin', '6285724026505'),
+            'whatsapp_admin' => Setting::get('whatsapp_admin', '6285181836438'),
         ];
     }
 
