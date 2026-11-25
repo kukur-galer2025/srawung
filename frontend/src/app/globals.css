@@ -550,6 +550,14 @@ body:has([aria-modal='true'], .swal2-container, .modal-backdrop) .kanca-launcher
 /* Perisai instan: dipasang langsung dari event keyboard/blur, tanpa transisi. */
 body.reader-shield .reader-page { background: #000 !important; }
 body.reader-shield .reader-page canvas { visibility: hidden !important; }
+/* HP: tekan lama tidak memunculkan menu simpan/salin/bagikan gambar (iPhone & Android). */
+body.reader-active .reader-page,
+body.reader-active .reader-page * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
 
 /* Halaman baca tidak bisa dicetak / disimpan sebagai PDF lewat dialog cetak. */
 @media print {

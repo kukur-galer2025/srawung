@@ -11,6 +11,7 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  ChevronsUpDown,
   ListTree,
   Loader2,
   Lock,
@@ -30,6 +31,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { readerDeviceId } from '@/lib/device';
 import { useAuth } from '@/contexts/AuthContext';
 import { showFlash } from '@/lib/flash';
 import { confirmDialog, toast } from '@/lib/dialog';
@@ -185,6 +187,8 @@ export default function ReaderPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [inputPage, setInputPage] = useState('1');
   const [scrub, setScrub] = useState<number | null>(null);
+  // HP: panel "Lompat ke halaman" (penggeser & kotak angka di bilah bawah terlalu kecil untuk jari).
+  const [jumpOpen, setJumpOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>('dark');
   const [panel, setPanel] = useState<Panel | null>(null);
   const t = THEMES[theme];
@@ -333,7 +337,7 @@ export default function ReaderPage() {
     if (!slug) return;
     let cancelled = false;
     api
-      .post(`/reader/${slug}/session`, {})
+      .post(`/reader/${slug}/session`, {}, { headers: { 'X-Reader-Device': readerDeviceId() } })
       .then((data) => {
         if (cancelled) return;
         setSessionToken(data.session_token);
@@ -389,7 +393,7 @@ export default function ReaderPage() {
       }
       try {
         const response = await fetch(`${API_URL}/reader/${slug}/pages/${page}`, {
-          headers: { Authorization: `Bearer ${sessionToken}` },
+          headers: { Authorization: `Bearer ${sessionToken}`, 'X-Reader-Device': readerDeviceId() },
         });
 
         if (!response.ok) {
@@ -531,7 +535,37 @@ export default function ReaderPage() {
     };
     const onBeforePrint = () => flashCapture();
 
+    /*
+     * HP (Android & iPhone). Tombol screenshot fisik tidak bisa dideteksi situs web mana pun,
+     * jadi yang dilakukan di sini adalah hal yang BISA dideteksi:
+     *  - gestur screenshot tiga jari (Xiaomi, Oppo, Vivo, Samsung): gelap begitu jari ketiga menyentuh;
+     *  - pindah aplikasi / kunci layar: gelap sebelum sistem mengambil gambar untuk daftar aplikasi.
+     */
+    let threeFinger = false;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length >= 3) {
+        threeFinger = true;
+        darken();
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (threeFinger && e.touches.length === 0) {
+        threeFinger = false;
+        lighten(1500);
+      }
+    };
+    const onHidden = () => {
+      if (document.hidden) darken();
+      else lighten(400);
+    };
+    const onPageHide = () => darken();
+
     window.addEventListener('blur', onBlur);
+    document.addEventListener('touchstart', onTouchStart, { capture: true, passive: true });
+    document.addEventListener('touchend', onTouchEnd, { capture: true, passive: true });
+    document.addEventListener('touchcancel', onTouchEnd, { capture: true, passive: true });
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', onPageHide);
     window.addEventListener('focus', onFocus);
     window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('keyup', onKeyUp, true);
@@ -543,6 +577,11 @@ export default function ReaderPage() {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
       window.removeEventListener('beforeprint', onBeforePrint);
+      document.removeEventListener('touchstart', onTouchStart, true);
+      document.removeEventListener('touchend', onTouchEnd, true);
+      document.removeEventListener('touchcancel', onTouchEnd, true);
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pagehide', onPageHide);
       document.body.classList.remove('reader-active', 'reader-shield');
       if (releaseTimer) clearTimeout(releaseTimer);
       if (shieldTimer.current) clearTimeout(shieldTimer.current);
@@ -899,6 +938,17 @@ export default function ReaderPage() {
         </button>
 
         <div className="flex min-w-0 flex-1 items-center justify-center gap-3">
+          {/* HP: ketuk nomor halaman → panel lompat ke halaman tertentu */}
+          <button
+            type="button"
+            onClick={() => setJumpOpen(true)}
+            aria-label={`Halaman ${currentPage} dari ${totalPages}. Ketuk untuk lompat ke halaman lain`}
+            className={`flex h-10 min-w-0 items-center gap-1.5 rounded-xl px-3.5 font-mono text-sm font-semibold transition sm:hidden ${t.chip}`}
+          >
+            {currentPage}
+            <span className="opacity-60">/ {totalPages}</span>
+            <ChevronsUpDown className="h-3.5 w-3.5 opacity-60" />
+          </button>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -906,7 +956,7 @@ export default function ReaderPage() {
               if (!isNaN(p) && p >= 1 && p <= totalPages) goToPage(p);
               else setInputPage(String(currentPage));
             }}
-            className="flex items-center gap-1"
+            className="hidden items-center gap-1 sm:flex"
           >
             <input
               type="text"
@@ -945,6 +995,27 @@ export default function ReaderPage() {
         </button>
       </footer>
 
+      {jumpOpen && (
+        <JumpSheet
+          current={currentPage}
+          total={totalPages}
+          chapter={currentChapter?.title ?? null}
+          hasToc={!!toc?.length}
+          bar={t.panel}
+          muted={t.muted}
+          chip={t.chip}
+          onClose={() => setJumpOpen(false)}
+          onGo={(p) => {
+            setJumpOpen(false);
+            goToPage(p);
+          }}
+          onToc={() => {
+            setJumpOpen(false);
+            setPanel('toc');
+          }}
+        />
+      )}
+
       {/* Sesi baca berakhir (mis. lama tidak aktif) */}
       {replaced && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-6 backdrop-blur">
@@ -977,6 +1048,117 @@ export default function ReaderPage() {
 }
 
 /* =================== Panel =================== */
+
+/**
+ * Panel "Lompat ke halaman" untuk HP: kotak angka besar (keyboard angka), penggeser,
+ * tombol cepat, dan pintasan ke daftar isi. Dirender di dalam area baca (bukan portal),
+ * supaya tetap tampil saat mode layar penuh.
+ */
+function JumpSheet({
+  current,
+  total,
+  chapter,
+  hasToc,
+  bar,
+  muted,
+  chip,
+  onClose,
+  onGo,
+  onToc,
+}: {
+  current: number;
+  total: number;
+  chapter: string | null;
+  hasToc: boolean;
+  bar: string;
+  muted: string;
+  chip: string;
+  onClose: () => void;
+  onGo: (page: number) => void;
+  onToc: () => void;
+}) {
+  const [value, setValue] = useState(String(current));
+  const n = parseInt(value, 10);
+  const valid = !isNaN(n) && n >= 1 && n <= total;
+  const clamp = (p: number) => Math.min(total, Math.max(1, p));
+  const set = (p: number) => setValue(String(clamp(p)));
+
+  return (
+    <div className="absolute inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Lompat ke halaman">
+      <div className="modal-backdrop absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (valid) onGo(n);
+        }}
+        className={`modal-panel relative w-full max-w-sm rounded-t-3xl border p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl ${bar}`}
+      >
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-base font-semibold">Lompat ke halaman</p>
+            <p className={`truncate text-xs ${muted}`}>
+              Sekarang hal. {current} dari {total}
+              {chapter ? ` · ${chapter}` : ''}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Tutup" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${chip}`}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value.replace(/\D/g, '').slice(0, 5))}
+            onFocus={(e) => e.currentTarget.select()}
+            aria-label="Nomor halaman tujuan"
+            className="h-14 min-w-0 flex-1 rounded-2xl border border-black/10 bg-black/5 text-center font-mono text-2xl font-bold outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <span className={`font-mono text-sm ${muted}`}>/ {total}</span>
+        </div>
+
+        <input
+          type="range"
+          min={1}
+          max={total || 1}
+          value={valid ? n : current}
+          onChange={(e) => setValue(e.target.value)}
+          aria-label="Geser untuk memilih halaman"
+          className="mt-5 h-2 w-full cursor-pointer appearance-none rounded-lg bg-black/15 accent-amber-400"
+        />
+
+        <div className="mt-4 grid grid-cols-4 gap-2 text-xs font-semibold">
+          {[
+            ['Awal', 1],
+            ['−10', (valid ? n : current) - 10],
+            ['+10', (valid ? n : current) + 10],
+            ['Akhir', total],
+          ].map(([label, page]) => (
+            <button key={label} type="button" onClick={() => set(page as number)} className={`h-10 rounded-xl ${chip}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {!valid && value !== '' && <p className="mt-3 text-center text-xs font-medium text-rose-500">Masukkan angka 1 sampai {total}.</p>}
+
+        <button type="submit" disabled={!valid} className="mt-4 h-12 w-full rounded-2xl bg-amber-400 text-sm font-bold text-slate-900 transition hover:bg-amber-300 disabled:opacity-40">
+          {valid ? `Buka halaman ${n}` : 'Buka halaman'}
+        </button>
+        {hasToc && (
+          <button type="button" onClick={onToc} className={`mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl text-sm font-semibold ${chip}`}>
+            <ListTree className="h-4 w-4" />
+            Pilih dari daftar isi
+          </button>
+        )}
+      </form>
+    </div>
+  );
+}
 
 function TocPanel({ toc, current, muted, onGo }: { toc: TocEntry[]; current: TocEntry | null; muted: string; onGo: (p: number) => void }) {
   const activeRef = useRef<HTMLButtonElement>(null);

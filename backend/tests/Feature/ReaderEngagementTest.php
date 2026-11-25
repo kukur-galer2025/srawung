@@ -120,17 +120,31 @@ class ReaderEngagementTest extends TestCase
 
     /* ---------------- Proteksi konten ---------------- */
 
-    public function test_same_account_can_read_on_many_devices_at_once(): void
+    public function test_many_devices_can_read_and_tokens_are_bound_to_their_device(): void
     {
         $owner = $this->owner();
         Sanctum::actingAs($owner);
+        $open = fn (string $device) => $this->postJson("/api/reader/{$this->book->slug}/session", [], ['X-Reader-Device' => $device])->assertOk()->json('session_token');
+        $page = fn (string $token, string $device) => $this->get("/api/reader/{$this->book->slug}/pages/1", ['Authorization' => "Bearer {$token}", 'X-Reader-Device' => $device]);
 
-        // Tiga perangkat membuka buku yang sama — semua sesi tetap aktif.
-        $tokens = [];
-        for ($i = 0; $i < 3; $i++) {
-            $tokens[] = $this->postJson("/api/reader/{$this->book->slug}/session")->assertOk()->json('session_token');
-        }
-        $this->assertSame(3, ReadingSession::where('user_id', $owner->id)->where('is_active', true)->count());
+        // Perangkat yang sama boleh membuka beberapa tab.
+        $hpA = $open('perangkat-hp-aaaaaaaaaa');
+        $open('perangkat-hp-aaaaaaaaaa');
+        $laptop = $open('perangkat-laptop-bbbbbbbb');
+        $this->travel(1)->minutes();
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs($owner);
+        $page($laptop, 'perangkat-laptop-bbbbbbbb')->assertOk();
+
+        // Tanpa batas perangkat: perangkat ketiga pun tetap bisa membaca bersamaan.
+        $hpC = $open('perangkat-hp-cccccccccc');
+        $this->flushHeaders();
+        $page($hpA, 'perangkat-hp-aaaaaaaaaa')->assertOk();
+        $page($laptop, 'perangkat-laptop-bbbbbbbb')->assertOk();
+        $page($hpC, 'perangkat-hp-cccccccccc')->assertOk();
+
+        // Token yang disalin ke perangkat lain tidak berlaku.
+        $page($hpC, 'perangkat-pencuri-dddddddd')->assertStatus(401)->assertJsonPath('code', 'session_invalid');
     }
 
     public function test_forensic_code_roundtrip_and_admin_lookup(): void

@@ -24,14 +24,25 @@ class ReaderController extends Controller
 
     /**
      * Batas kecepatan ambil halaman per akun: [batas, jendela detik, label].
-     * Pembaca manusia rata-rata < 6 halaman/menit; batas ini longgar untuk pembaca
-     * cepat, tapi menghentikan skrip yang mengunduh seluruh buku.
+     * Pembaca manusia rata-rata < 6 halaman/menit (lompat halaman hanya memuat 1 halaman);
+     * batas ini cukup untuk pembaca cepat, tapi segera menghentikan skrip pengunduh buku.
      */
     public const RATE_LIMITS = [
-        'menit' => [30, 60],
-        'jam' => [360, 3600],
-        'hari' => [1500, 86400],
+        'menit' => [20, 60],
+        'jam' => [240, 3600],
+        'hari' => [900, 86400],
     ];
+
+    /**
+     * Id perangkat dari peramban pembaca (header X-Reader-Device, acak & disimpan di peramban).
+     * Tanpa header (klien lama), dipakai sidik jari peramban + IP.
+     */
+    private function deviceId(Request $request): string
+    {
+        $id = (string) $request->header('X-Reader-Device');
+
+        return preg_match('/^[A-Za-z0-9_-]{16,64}$/', $id) ? $id : 'ua-' . substr(hash('sha256', $request->userAgent() . '|' . $request->ip()), 0, 40);
+    }
 
     public function startSession(Request $request, $bookSlug)
     {
@@ -54,6 +65,9 @@ class ReaderController extends Controller
             ->where(fn ($q) => $q->whereNull('last_seen_at')->orWhere('last_seen_at', '<', now()->subMinutes(self::IDLE_MINUTES)))
             ->update(['is_active' => false, 'ended_reason' => 'idle']);
 
+        // Token sesi diikat ke perangkat ini (lihat getPage).
+        $device = $this->deviceId($request);
+
         $sessionToken = Str::random(64);
 
         $session = ReadingSession::create([
@@ -64,6 +78,7 @@ class ReaderController extends Controller
             'last_seen_at' => Carbon::now(),
             'ip_address' => $request->ip() ?: '127.0.0.1',
             'device' => mb_substr((string) $request->userAgent(), 0, 250),
+            'device_id' => $device,
             'is_active' => true,
         ]);
 
@@ -106,6 +121,11 @@ class ReaderController extends Controller
 
         if ($session->is_active && $session->last_seen_at && $session->last_seen_at->lt(now()->subMinutes(self::IDLE_MINUTES))) {
             $session->update(['is_active' => false, 'ended_reason' => 'idle']);
+        }
+
+        // Token sesi hanya berlaku di perangkat yang membukanya (tidak bisa disalin ke perangkat lain).
+        if ($session->device_id && !hash_equals($session->device_id, $this->deviceId($request))) {
+            return response()->json(['message' => 'Sesi baca ini milik perangkat lain. Muat ulang halaman untuk membaca di perangkat ini.', 'code' => 'session_invalid'], 401);
         }
 
         if (!$session->is_active) {

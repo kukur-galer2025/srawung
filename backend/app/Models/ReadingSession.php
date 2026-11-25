@@ -18,6 +18,7 @@ class ReadingSession extends Model
         'started_at',
         'ip_address',
         'device',
+        'device_id',
         'is_active',
         'last_seen_at',
         'ended_reason',
